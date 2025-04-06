@@ -24,19 +24,22 @@ FEATHERLESS_MODEL = "deepseek-ai/DeepSeek-V3-0324"
 # Initialize embeddings
 def get_embeddings():
     """
-    Get embeddings model - try Featherless first, fallback to OpenAI
+    Get embeddings model - use FastEmbed for Featherless, fallback to OpenAI
     """
     try:
-        # Try using Featherless AI for embeddings
+        # When using Featherless AI, we'll use FastEmbed for embeddings
+        # since Featherless doesn't support embeddings API
         if FEATHERLESS_API_KEY:
-            logger.info("Using Featherless AI for embeddings")
-            return OpenAIEmbeddings(
-                openai_api_key=FEATHERLESS_API_KEY,
-                model="text-embedding-ada-002",  # Compatible embedding model
-                base_url=FEATHERLESS_BASE_URL
+            logger.info("Using FastEmbed for embeddings (Nomic AI model)")
+            from langchain_community.embeddings import FastEmbedEmbeddings
+            
+            # Use Nomic AI's embedding model through FastEmbed
+            return FastEmbedEmbeddings(
+                model_name="nomic-ai/nomic-embed-text-v1.5",
+                max_length=512
             )
     except Exception as e:
-        logger.warning(f"Failed to initialize Featherless embeddings: {str(e)}")
+        logger.warning(f"Failed to initialize FastEmbed embeddings: {str(e)}")
     
     # Fallback to OpenAI embeddings
     logger.info("Using OpenAI for embeddings")

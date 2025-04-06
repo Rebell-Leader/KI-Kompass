@@ -202,6 +202,61 @@ def profile():
     user = User.query.get(session['user_id'])
     return render_template('profile.html', user=user)
 
+@app.route('/update_profile/<int:user_id>', methods=['POST'])
+@login_required
+def update_profile(user_id):
+    # Ensure user can only update their own data
+    if session.get('user_id') != user_id:
+        flash('You are not authorized to update this profile', 'danger')
+        return redirect(url_for('profile'))
+    
+    user = User.query.get(user_id)
+    
+    if not user:
+        flash('User not found', 'danger')
+        return redirect(url_for('profile'))
+    
+    # Update user fields from form data
+    if request.form.get('full_name'):
+        user.full_name = request.form.get('full_name')
+    if request.form.get('nationality'):
+        user.nationality = request.form.get('nationality')
+    if request.form.get('visa_type'):
+        user.visa_type = request.form.get('visa_type')
+    if request.form.get('arrival_date'):
+        try:
+            user.arrival_date = datetime.strptime(request.form.get('arrival_date'), '%Y-%m-%d')
+        except:
+            pass
+    if request.form.get('german_level'):
+        user.german_level = request.form.get('german_level')
+    if request.form.get('employment_status'):
+        user.employment_status = request.form.get('employment_status')
+    
+    # Handle boolean fields
+    user.has_family = request.form.get('has_family') == 'true'
+    
+    if user.has_family:
+        if request.form.get('spouse_nationality'):
+            user.spouse_nationality = request.form.get('spouse_nationality')
+        if request.form.get('num_children'):
+            try:
+                user.num_children = int(request.form.get('num_children'))
+            except:
+                pass
+    
+    # Mark as onboarded
+    user.onboarded = True
+    
+    try:
+        db.session.commit()
+        flash('Profile updated successfully', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating profile: {str(e)}', 'danger')
+    
+    return redirect(url_for('profile'))
+
 @app.route('/chat')
 @login_required
 def chat():
@@ -262,6 +317,10 @@ def update_task():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
+
+# Register blueprints
+from routers.users import users_bp
+app.register_blueprint(users_bp, name='users_blueprint')
 
 # Initialize database
 with app.app_context():
