@@ -15,6 +15,35 @@ FEATHERLESS_API_KEY = os.environ.get("FEATHERLESS_API_KEY")
 FEATHERLESS_BASE_URL = "https://api.featherless.ai/v1"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
+def validate_api_keys() -> tuple:
+    """
+    Check if the API keys are valid.
+    
+    Returns:
+        tuple: (has_featherless, has_openai)
+    """
+    has_featherless = False
+    has_openai = False
+    
+    if FEATHERLESS_API_KEY:
+        try:
+            # Simple test prompt to check if the API key works
+            test_response = call_featherless_api("Hello, this is a test.", max_tokens=10)
+            has_featherless = test_response != ""
+        except Exception as e:
+            logger.warning(f"Featherless API key validation failed: {e}")
+    
+    if OPENAI_API_KEY:
+        try:
+            # Simple test prompt to check if the API key works
+            test_response = call_openai_api("Hello, this is a test.", max_tokens=10)
+            has_openai = test_response != ""
+        except Exception:
+            # The exception is already logged in call_openai_api
+            pass
+            
+    return (has_featherless, has_openai)
+
 def get_direct_llm_response(prompt: str, max_tokens: int = 512) -> str:
     """
     Get a direct response from an LLM without using LangChain.
@@ -59,7 +88,7 @@ def call_featherless_api(prompt: str, max_tokens: int = 512) -> str:
     }
     
     data = {
-        "model": "gpt-4",  # Featherless model name
+        "model": "gpt-3.5-turbo",  # Featherless model name (they don't support gpt-4)
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": 0.7

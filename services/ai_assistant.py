@@ -73,9 +73,6 @@ def get_ai_response(query, user, conversation_id=None):
             # Skip the retrieval chain and just use direct API calls
             ai_response = ""
             
-            # Use direct OpenAI API call through our helper function
-            from services.direct_llm import get_direct_llm_response
-            
             # Prepare a simple prompt
             prompt = f"""You are KI Kompass, an AI assistant helping people relocate to Munich, Germany.
             Be friendly, helpful, and provide very concise information.
@@ -87,6 +84,17 @@ def get_ai_response(query, user, conversation_id=None):
             
             Your short, concise response:"""
             
+            # Get direct API caller
+            from services.direct_llm import get_direct_llm_response
+            
+            # Check if we have API keys before making the call
+            from os import environ
+            has_featherless_key = bool(environ.get("FEATHERLESS_API_KEY"))
+            has_openai_key = bool(environ.get("OPENAI_API_KEY"))
+            
+            if not has_featherless_key and not has_openai_key:
+                raise ValueError("No API keys configured. Please set up FEATHERLESS_API_KEY or OPENAI_API_KEY environment variables.")
+                
             ai_response = get_direct_llm_response(prompt)
             
             # Save the assistant response to the database
