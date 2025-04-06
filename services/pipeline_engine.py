@@ -50,15 +50,20 @@ def select_steps_for_user(user):
     """
     Select appropriate action steps based on user profile.
     """
+    from sqlalchemy import text
+    
+    # Start with a base query
     query = ActionStep.query
     
     # Filter by visa types if specified
     if user.visa_type:
-        # Find steps that either don't specify visa types or include this visa type
+        # For JSON filtering, use the PostgreSQL JSON functions properly
+        # Either the visa_types is an empty array OR the user's visa_type is in the array
+        # Note: We need to use SQLAlchemy text() for the PostgreSQL-specific JSON operators
         query = query.filter(
             db.or_(
-                ActionStep.visa_types == '[]',  # Empty list = applies to all
-                ActionStep.visa_types.contains(user.visa_type)
+                text("visa_types::text = '[]'"),  # Empty array means applies to all
+                text(f"visa_types::jsonb ? :visa_type").bindparams(visa_type=user.visa_type)
             )
         )
     
