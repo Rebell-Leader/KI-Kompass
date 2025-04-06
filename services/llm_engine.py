@@ -54,21 +54,21 @@ def get_llm():
     if FEATHERLESS_API_KEY:
         try:
             logger.info("Using Featherless AI LLM")
-            # Use the more reliable init through explicit headers and config
             from langchain_openai import ChatOpenAI
-            from langchain_core.utils.function_calling import convert_to_openai_function
             
-            headers = {
-                "Authorization": f"Bearer {FEATHERLESS_API_KEY}"
-            }
-            
+            # Properly configure model for Featherless AI
+            # Don't pass headers directly to the constructor, use model_kwargs instead
             return ChatOpenAI(
                 temperature=0.7,
                 model=FEATHERLESS_MODEL,
                 api_key=FEATHERLESS_API_KEY,
                 base_url=FEATHERLESS_BASE_URL,
                 max_tokens=2048,
-                headers=headers
+                model_kwargs={
+                    "headers": {
+                        "Authorization": f"Bearer {FEATHERLESS_API_KEY}"
+                    }
+                }
             )
         except Exception as e:
             logger.warning(f"Failed to initialize Featherless LLM: {str(e)}")
@@ -82,7 +82,7 @@ def get_llm():
             # do not change this unless explicitly requested by the user
             return ChatOpenAI(
                 temperature=0.7,
-                model="gpt-4o",
+                model="gpt-3.5-turbo",  # Use 3.5-turbo for cost-effectiveness
                 api_key=OPENAI_API_KEY
             )
         except Exception as e:
