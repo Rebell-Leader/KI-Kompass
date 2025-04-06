@@ -68,34 +68,22 @@ def get_ai_response(query, user, conversation_id=None):
         if len(prev_messages) > 1:  # Skip if this is the first message
             context_prompt = f"Based on our conversation about {conversation_summary}, "
         
-        # Using direct OpenAI API instead of LangChain to avoid timeouts
+        # Attempt with robust error handling and shorter timeout
         try:
-            # Skip the retrieval chain and just use direct API calls
             ai_response = ""
-            
-            # Prepare a simple prompt
-            prompt = f"""You are KI Kompass, an AI assistant helping people relocate to Munich, Germany.
-            Be friendly, helpful, and provide very concise information.
-            Keep your responses under 100 words to avoid timeouts.
-            
-            User profile: {user_profile}
-            
-            User question: {context_prompt + query}
-            
-            Your short, concise response:"""
-            
-            # Get direct API caller
-            from services.direct_llm import get_direct_llm_response
-            
-            # Check if we have API keys before making the call
-            from os import environ
-            has_featherless_key = bool(environ.get("FEATHERLESS_API_KEY"))
-            has_openai_key = bool(environ.get("OPENAI_API_KEY"))
-            
-            if not has_featherless_key and not has_openai_key:
-                raise ValueError("No API keys configured. Please set up FEATHERLESS_API_KEY or OPENAI_API_KEY environment variables.")
-                
-            ai_response = get_direct_llm_response(prompt)
+            if is_relocation_query:
+                # Use conversational retrieval chain for relocation-specific queries
+                chain = get_conversation_chain()
+                response = chain({"question": context_prompt + query})
+                ai_response = response.get("answer", "I don't have specific information about that aspect of relocation.")
+            else:
+                # Use basic chain for general queries
+                chain = get_basic_chain()
+                response = chain({
+                    "user_profile": str(user_profile), 
+                    "query": context_prompt + query
+                })
+                ai_response = response.get("text", "I'm not sure how to answer that question.")
             
             # Save the assistant response to the database
             assistant_message = ChatMessage(
