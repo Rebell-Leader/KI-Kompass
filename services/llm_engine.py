@@ -56,19 +56,13 @@ def get_llm():
             logger.info("Using Featherless AI LLM")
             from langchain_openai import ChatOpenAI
             
-            # Properly configure model for Featherless AI
-            # Don't pass headers directly to the constructor, use model_kwargs instead
+            # Use a simpler approach - just configure the base URL and API key
+            # OpenAI-compatible endpoints don't need additional headers
             return ChatOpenAI(
                 temperature=0.7,
                 model=FEATHERLESS_MODEL,
                 api_key=FEATHERLESS_API_KEY,
-                base_url=FEATHERLESS_BASE_URL,
-                max_tokens=2048,
-                model_kwargs={
-                    "headers": {
-                        "Authorization": f"Bearer {FEATHERLESS_API_KEY}"
-                    }
-                }
+                base_url=FEATHERLESS_BASE_URL
             )
         except Exception as e:
             logger.warning(f"Failed to initialize Featherless LLM: {str(e)}")
@@ -77,9 +71,6 @@ def get_llm():
     if OPENAI_API_KEY:
         try:
             logger.info("Using OpenAI LLM as fallback")
-            # Update to latest gpt-4o model for better responses
-            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
-            # do not change this unless explicitly requested by the user
             return ChatOpenAI(
                 temperature=0.7,
                 model="gpt-3.5-turbo",  # Use 3.5-turbo for cost-effectiveness
