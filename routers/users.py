@@ -140,5 +140,4 @@ def update_user(user_id):
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
-# Register blueprint
-app.register_blueprint(users_bp)
+# Blueprint registration moved to app.py

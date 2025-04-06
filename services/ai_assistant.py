@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 import uuid
 from services.llm_engine import get_conversation_chain, get_basic_chain
 from models import ChatMessage
@@ -70,20 +71,42 @@ def get_ai_response(query, user, conversation_id=None):
         
         # Attempt with robust error handling and shorter timeout
         try:
+            # Set timeout for LLM request
+            start_time = time.time()
+            max_time = 3.0  # 3 seconds max to avoid worker timeout
+            
             ai_response = ""
-            if is_relocation_query:
-                # Use conversational retrieval chain for relocation-specific queries
-                chain = get_conversation_chain()
-                response = chain({"question": context_prompt + query})
-                ai_response = response.get("answer", "I don't have specific information about that aspect of relocation.")
+            
+            # For very simple queries, provide direct responses without LLM
+            if len(query.strip()) <= 3:
+                ai_response = "I'm your Munich relocation assistant. Could you please ask a more detailed question about moving to Munich?"
+            elif query.lower() in ["hello", "hi", "hey", "hallo", "greetings"]:
+                ai_response = f"Hello{' ' + user.full_name if user.full_name else ''}! I'm KI Kompass, your Munich relocation assistant. How can I help you today?"
             else:
-                # Use basic chain for general queries
-                chain = get_basic_chain()
-                response = chain({
-                    "user_profile": str(user_profile), 
-                    "query": context_prompt + query
-                })
-                ai_response = response.get("text", "I'm not sure how to answer that question.")
+                # Only use LLM for more complex queries
+                if is_relocation_query:
+                    # Use conversational retrieval chain for relocation-specific queries
+                    chain = get_conversation_chain()
+                    response = chain({"question": context_prompt + query})
+                    ai_response = response.get("answer", "I don't have specific information about that aspect of relocation.")
+                else:
+                    # Use basic chain for general queries
+                    chain = get_basic_chain()
+                    response = chain({
+                        "user_profile": str(user_profile), 
+                        "query": context_prompt + query
+                    })
+                    ai_response = response.get("text", "I'm not sure how to answer that question.")
+                
+                # Check if we're approaching the timeout
+                elapsed = time.time() - start_time
+                if elapsed > max_time * 0.8:  # If we're using more than 80% of our time budget
+                    logger.warning(f"LLM response taking too long ({elapsed:.2f}s), truncating")
+                    if ai_response:
+                        # Truncate the response to avoid further processing time
+                        ai_response = ai_response[:100] + "... (response truncated due to time constraints)"
+                    else:
+                        ai_response = "I apologize, but I couldn't generate a complete response in time. Please try asking a simpler question."
             
             # Save the assistant response to the database
             assistant_message = ChatMessage(

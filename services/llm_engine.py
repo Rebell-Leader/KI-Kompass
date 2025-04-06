@@ -56,17 +56,15 @@ def get_llm():
             logger.info("Using Featherless AI LLM")
             from langchain_openai import ChatOpenAI
             
-            # Use a simpler approach - just configure the base URL and API key
-            # OpenAI-compatible endpoints don't need additional headers
-            # Set reasonable timeouts to avoid worker timeouts
+            # Even more conservative timeouts to prevent worker errors
             return ChatOpenAI(
-                temperature=0.7,
+                temperature=0.5,  # Lower temperature for more focused responses
                 model=FEATHERLESS_MODEL,
                 api_key=FEATHERLESS_API_KEY,
                 base_url=FEATHERLESS_BASE_URL,
-                request_timeout=10.0,  # 10 seconds timeout - reduced to prevent worker timeouts
-                max_retries=1,
-                streaming=True  # Enable streaming to get faster initial responses
+                request_timeout=5.0,  # 5 seconds timeout to prevent worker timeouts
+                max_retries=0,  # Don't retry to avoid worker timeouts
+                streaming=False  # Disable streaming for now to debug the timeout issue
             )
         except Exception as e:
             logger.warning(f"Failed to initialize Featherless LLM: {str(e)}")
@@ -76,12 +74,12 @@ def get_llm():
         try:
             logger.info("Using OpenAI LLM as fallback")
             return ChatOpenAI(
-                temperature=0.7,
-                model="gpt-3.5-turbo",  # Use 3.5-turbo for cost-effectiveness
+                temperature=0.5,  # Lower temperature for more focused responses
+                model="gpt-3.5-turbo",  # Use 3.5-turbo for cost-effectiveness and speed
                 api_key=OPENAI_API_KEY,
-                request_timeout=10.0,  # 10 seconds timeout - reduced to prevent worker timeouts
-                max_retries=1,
-                streaming=True  # Enable streaming to get faster initial responses
+                request_timeout=5.0,  # 5 seconds timeout
+                max_retries=0,  # Don't retry to avoid worker timeouts
+                streaming=False  # Disable streaming for now to debug the timeout issue
             )
         except Exception as e:
             logger.warning(f"Failed to initialize OpenAI LLM: {str(e)}")
@@ -172,7 +170,7 @@ def get_basic_chain():
     template = """
     You are KI Kompass, an AI assistant helping people relocate to Munich, Germany.
     Be friendly, helpful, and provide very concise information.
-    Keep your responses under 120 words to avoid timeouts.
+    Keep your responses under 80 words to avoid timeouts.
     
     User profile: {user_profile}
     
@@ -189,7 +187,8 @@ def get_basic_chain():
     chain = LLMChain(
         llm=llm, 
         prompt=prompt, 
-        verbose=True
+        verbose=True,
+        output_key="text"  # Fix the output key to match what ai_assistant.py expects
     )
     
     return chain

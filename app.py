@@ -174,7 +174,7 @@ def dashboard():
     completed_tasks = [t for t, s in tasks_with_status if s and s.completed]
     
     # Get current datetime for the template
-    current_datetime = datetime.utcnow()
+    now = datetime.utcnow()
     
     return render_template(
         'dashboard.html', 
@@ -182,7 +182,7 @@ def dashboard():
         pipeline=pipeline, 
         upcoming_tasks=upcoming_tasks,
         completed_tasks=completed_tasks,
-        now=current_datetime  # Pass current datetime to replace the missing 'now' variable
+        now=now  # Pass current datetime for date comparisons
     )
 
 @app.route('/profile')
@@ -333,7 +333,7 @@ def update_task():
 
 # Register blueprints
 from routers.users import users_bp
-app.register_blueprint(users_bp, name='users_blueprint')
+app.register_blueprint(users_bp, url_prefix='/api')
 
 # Database already initialized in database.py
 
