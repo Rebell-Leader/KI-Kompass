@@ -1,5 +1,10 @@
 import os
+import logging
 from services.llm_engine import get_conversation_chain, get_basic_chain
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def get_ai_response(query, user):
     """
@@ -12,10 +17,12 @@ def get_ai_response(query, user):
     Returns:
         str: The AI-generated response
     """
-    # Check if API key is set
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        return "AI assistant is currently unavailable. Please set up your OpenAI API key."
+    # Check if any LLM API key is set
+    featherless_api_key = os.environ.get("FEATHERLESS_API_KEY")
+    openai_api_key = os.environ.get("OPENAI_API_KEY")
+    
+    if not featherless_api_key and not openai_api_key:
+        return "AI assistant is currently unavailable. Please set up either Featherless AI or OpenAI API key."
     
     try:
         # Prepare user profile context
@@ -37,6 +44,8 @@ def get_ai_response(query, user):
         # Check if query is related to relocation
         is_relocation_query = any(keyword in query.lower() for keyword in relocation_keywords)
         
+        logger.info(f"Processing query: '{query}' (relocation-specific: {is_relocation_query})")
+        
         if is_relocation_query:
             # Use conversational retrieval chain for relocation-specific queries
             chain = get_conversation_chain()
@@ -49,5 +58,6 @@ def get_ai_response(query, user):
             return response["text"]
     
     except Exception as e:
-        print(f"Error in AI response generation: {str(e)}")
+        error_msg = f"Error in AI response generation: {str(e)}"
+        logger.error(error_msg)
         return f"I'm sorry, I encountered an error while processing your request. Please try again later. (Error: {str(e)})"

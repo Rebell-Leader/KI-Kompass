@@ -1,4 +1,5 @@
 import os
+import logging
 from langchain_community.llms import OpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
@@ -8,29 +9,62 @@ from langchain_community.vectorstores import Qdrant
 from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Get API keys from environment variables
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 FEATHERLESS_API_KEY = os.environ.get("FEATHERLESS_API_KEY", "")
 
+# Featherless AI configuration
+FEATHERLESS_BASE_URL = "https://api.featherless.ai/v1"
+FEATHERLESS_MODEL = "deepseek-ai/DeepSeek-V3-0324"
+
 # Initialize embeddings
 def get_embeddings():
-    # For embeddings, we'll still use OpenAI as it's more reliable for vector search
+    """
+    Get embeddings model - try Featherless first, fallback to OpenAI
+    """
+    try:
+        # Try using Featherless AI for embeddings
+        if FEATHERLESS_API_KEY:
+            logger.info("Using Featherless AI for embeddings")
+            return OpenAIEmbeddings(
+                openai_api_key=FEATHERLESS_API_KEY,
+                model="text-embedding-ada-002",  # Compatible embedding model
+                base_url=FEATHERLESS_BASE_URL
+            )
+    except Exception as e:
+        logger.warning(f"Failed to initialize Featherless embeddings: {str(e)}")
+    
+    # Fallback to OpenAI embeddings
+    logger.info("Using OpenAI for embeddings")
     return OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 
 # Initialize language model
 def get_llm():
+    """
+    Get language model - try Featherless first, fallback to OpenAI
+    """
     # Try to use Featherless AI as our primary LLM provider
     if FEATHERLESS_API_KEY:
-        return ChatOpenAI(
-            temperature=0.7,
-            model="deepseek-ai/DeepSeek-V3-0324",  # Featherless model
-            api_key=FEATHERLESS_API_KEY,
-            base_url="https://api.featherless.ai/v1"
-        )
-    # Fall back to OpenAI if Featherless API key is not available
+        try:
+            logger.info("Using Featherless AI LLM")
+            return ChatOpenAI(
+                temperature=0.7,
+                model=FEATHERLESS_MODEL,
+                api_key=FEATHERLESS_API_KEY,
+                base_url=FEATHERLESS_BASE_URL
+            )
+        except Exception as e:
+            logger.warning(f"Failed to initialize Featherless LLM: {str(e)}")
+    
+    # Fall back to OpenAI if Featherless API key is not available or fails
+    logger.info("Using OpenAI LLM as fallback")
     return ChatOpenAI(
         temperature=0.7,
-        model="gpt-3.5-turbo",  # OpenAI model
+        model="gpt-3.5-turbo",
         api_key=OPENAI_API_KEY
     )
 
