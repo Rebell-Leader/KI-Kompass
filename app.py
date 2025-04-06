@@ -152,6 +152,8 @@ def onboarding():
 @app.route('/dashboard')
 @login_required
 def dashboard():
+    from datetime import datetime
+    
     user = User.query.get(session['user_id'])
     
     if not user.onboarded:
@@ -182,12 +184,16 @@ def dashboard():
     # Completed tasks
     completed_tasks = [t for t, s in tasks_with_status if s and s.completed]
     
+    # Get current datetime for the template
+    current_datetime = datetime.utcnow()
+    
     return render_template(
         'dashboard.html', 
         user=user, 
         pipeline=pipeline, 
         upcoming_tasks=upcoming_tasks,
-        completed_tasks=completed_tasks
+        completed_tasks=completed_tasks,
+        now=current_datetime  # Pass current datetime to replace the missing 'now' variable
     )
 
 @app.route('/profile')

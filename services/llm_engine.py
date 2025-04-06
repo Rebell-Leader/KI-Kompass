@@ -5,22 +5,33 @@ from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import Qdrant
-from langchain_community.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
 
-# Get API key from environment variable
+# Get API keys from environment variables
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+FEATHERLESS_API_KEY = os.environ.get("FEATHERLESS_API_KEY", "")
 
 # Initialize embeddings
 def get_embeddings():
+    # For embeddings, we'll still use OpenAI as it's more reliable for vector search
     return OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 
 # Initialize language model
 def get_llm():
+    # Try to use Featherless AI as our primary LLM provider
+    if FEATHERLESS_API_KEY:
+        return ChatOpenAI(
+            temperature=0.7,
+            model="deepseek-ai/DeepSeek-V3-0324",  # Featherless model
+            api_key=FEATHERLESS_API_KEY,
+            base_url="https://api.featherless.ai/v1"
+        )
+    # Fall back to OpenAI if Featherless API key is not available
     return ChatOpenAI(
         temperature=0.7,
-        model_name="gpt-3.5-turbo",
-        openai_api_key=OPENAI_API_KEY
+        model="gpt-3.5-turbo",  # OpenAI model
+        api_key=OPENAI_API_KEY
     )
 
 # Get knowledge base for relocation to Munich
