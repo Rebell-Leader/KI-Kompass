@@ -54,22 +54,43 @@ def get_llm():
     if FEATHERLESS_API_KEY:
         try:
             logger.info("Using Featherless AI LLM")
+            # Use the more reliable init through explicit headers and config
+            from langchain_openai import ChatOpenAI
+            from langchain_core.utils.function_calling import convert_to_openai_function
+            
+            headers = {
+                "Authorization": f"Bearer {FEATHERLESS_API_KEY}"
+            }
+            
             return ChatOpenAI(
                 temperature=0.7,
                 model=FEATHERLESS_MODEL,
                 api_key=FEATHERLESS_API_KEY,
-                base_url=FEATHERLESS_BASE_URL
+                base_url=FEATHERLESS_BASE_URL,
+                max_tokens=2048,
+                headers=headers
             )
         except Exception as e:
             logger.warning(f"Failed to initialize Featherless LLM: {str(e)}")
     
     # Fall back to OpenAI if Featherless API key is not available or fails
-    logger.info("Using OpenAI LLM as fallback")
-    return ChatOpenAI(
-        temperature=0.7,
-        model="gpt-3.5-turbo",
-        api_key=OPENAI_API_KEY
-    )
+    if OPENAI_API_KEY:
+        try:
+            logger.info("Using OpenAI LLM as fallback")
+            # Update to latest gpt-4o model for better responses
+            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+            # do not change this unless explicitly requested by the user
+            return ChatOpenAI(
+                temperature=0.7,
+                model="gpt-4o",
+                api_key=OPENAI_API_KEY
+            )
+        except Exception as e:
+            logger.warning(f"Failed to initialize OpenAI LLM: {str(e)}")
+    
+    # If all else fails, return a more descriptive error message
+    logger.error("No LLM provider available - both Featherless and OpenAI initialization failed")
+    raise ValueError("Could not initialize any LLM provider. Please check your API keys and connections.")
 
 # Get knowledge base for relocation to Munich
 def get_knowledge_base():
