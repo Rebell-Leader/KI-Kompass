@@ -58,11 +58,14 @@ def get_llm():
             
             # Use a simpler approach - just configure the base URL and API key
             # OpenAI-compatible endpoints don't need additional headers
+            # Set reasonable timeouts to avoid worker timeouts
             return ChatOpenAI(
                 temperature=0.7,
                 model=FEATHERLESS_MODEL,
                 api_key=FEATHERLESS_API_KEY,
-                base_url=FEATHERLESS_BASE_URL
+                base_url=FEATHERLESS_BASE_URL,
+                request_timeout=15.0,  # 15 seconds timeout
+                max_retries=2
             )
         except Exception as e:
             logger.warning(f"Failed to initialize Featherless LLM: {str(e)}")
@@ -74,7 +77,9 @@ def get_llm():
             return ChatOpenAI(
                 temperature=0.7,
                 model="gpt-3.5-turbo",  # Use 3.5-turbo for cost-effectiveness
-                api_key=OPENAI_API_KEY
+                api_key=OPENAI_API_KEY,
+                request_timeout=15.0,  # 15 seconds timeout
+                max_retries=2
             )
         except Exception as e:
             logger.warning(f"Failed to initialize OpenAI LLM: {str(e)}")

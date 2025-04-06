@@ -129,10 +129,14 @@ def get_ai_response(query, user, conversation_id=None):
         
         # Provide a user-friendly message based on the error type
         response_msg = "I'm sorry, I encountered an unexpected error. Please try again with a different question."
+        
         if "API key" in str(e).lower() or "authentication" in str(e).lower():
             response_msg = "I'm sorry, there seems to be an issue with the AI service authentication. Please contact support."
-        elif "timeout" in str(e).lower() or "connection" in str(e).lower():
-            response_msg = "I'm sorry, I couldn't connect to the AI service. Please check your internet connection and try again."
+        elif "timeout" in str(e).lower() or "connection" in str(e).lower() or "worker timeout" in str(e).lower():
+            response_msg = "I'm sorry, your request timed out. Please try asking a shorter, more specific question."
+            logger.warning("Request timed out. Consider adjusting the timeout settings or optimizing the prompt.")
+        elif "too many tokens" in str(e).lower() or "token limit" in str(e).lower() or "context length" in str(e).lower():
+            response_msg = "I'm sorry, your question is too complex for me to process. Please try breaking it into smaller, more focused questions."
         
         try:
             # Try to save the error response, but don't crash if this fails too
