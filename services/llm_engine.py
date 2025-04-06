@@ -64,8 +64,9 @@ def get_llm():
                 model=FEATHERLESS_MODEL,
                 api_key=FEATHERLESS_API_KEY,
                 base_url=FEATHERLESS_BASE_URL,
-                request_timeout=15.0,  # 15 seconds timeout
-                max_retries=2
+                request_timeout=10.0,  # 10 seconds timeout - reduced to prevent worker timeouts
+                max_retries=1,
+                streaming=True  # Enable streaming to get faster initial responses
             )
         except Exception as e:
             logger.warning(f"Failed to initialize Featherless LLM: {str(e)}")
@@ -78,8 +79,9 @@ def get_llm():
                 temperature=0.7,
                 model="gpt-3.5-turbo",  # Use 3.5-turbo for cost-effectiveness
                 api_key=OPENAI_API_KEY,
-                request_timeout=15.0,  # 15 seconds timeout
-                max_retries=2
+                request_timeout=10.0,  # 10 seconds timeout - reduced to prevent worker timeouts
+                max_retries=1,
+                streaming=True  # Enable streaming to get faster initial responses
             )
         except Exception as e:
             logger.warning(f"Failed to initialize OpenAI LLM: {str(e)}")
@@ -168,14 +170,15 @@ def get_basic_chain():
     llm = get_llm()
     
     template = """
-    You are KI Kompass, an AI assistant specializing in helping people relocate to Munich, Germany.
-    Be friendly, helpful, and provide concise information about relocation processes, requirements, and tips.
+    You are KI Kompass, an AI assistant helping people relocate to Munich, Germany.
+    Be friendly, helpful, and provide very concise information.
+    Keep your responses under 120 words to avoid timeouts.
     
     User profile: {user_profile}
     
     User question: {query}
     
-    Your response:
+    Your short, concise response:
     """
     
     prompt = PromptTemplate(
