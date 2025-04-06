@@ -1,0 +1,130 @@
+## **Initial Idea Description**
+
+We are developing an MVP for a relocation and integration assistant tailored for Munich. The system will guide users through mandatory and optional steps for settling in Germany, including registration, obtaining a tax ID, applying for a residence permit, and more. The backend will handle user profiling, pipeline generation, task tracking, notifications, and AI-powered assistance using Langchain. The frontend will provide a user-friendly interface for onboarding, pipeline visualization, chatbot interaction, and notifications.
+
+---
+
+## **Tasks List**
+
+### **Backend Tasks**
+
+#### **1. Set Up Backend Framework**
+- **Description**: Initialize the backend using Python with FastAPI. Create basic folder structure (`/src/api`, `/src/core`, `/src/models`, etc.).
+- **Implementation Details**:
+  - Use FastAPI for API endpoints.
+  - Set up PostgreSQL as the database.
+  - Install required libraries: `fastapi`, `sqlalchemy`, `langchain`, `qdrant-client`, `pydantic`.
+- **Dependencies**: None.
+
+#### **2. Define Database Models**
+- **Description**: Create database models for `User`, `IntegrationPipeline`, and `ActionStep` using SQLAlchemy.
+- **Implementation Details**:
+  - Define tables with fields matching the data model (e.g., user_id, visa_type, etc.).
+  - Implement migrations using Alembic.
+- **Dependencies**: PostgreSQL setup.
+
+#### **3. Create User API Endpoints**
+- **Description**: Implement endpoints to manage user data (`POST /api/users`, `GET /api/users/{id}`).
+- **Implementation Details**:
+  - Use FastAPI to define routes.
+  - Implement CRUD operations for user data.
+- **Dependencies**: Database models.
+
+#### **4. Implement Integration Pipeline Logic**
+- **Description**: Develop logic to generate a personalized pipeline based on user profile data.
+- **Implementation Details**:
+  - Create a function in `/src/core/pipeline_engine/step_selector.py` to select steps dynamically based on visa type, location, etc.
+  - Store generated pipelines in the database.
+- **Dependencies**: User API.
+
+#### **5. Build ActionStep Templates**
+- **Description**: Populate the database with predefined action steps (e.g., Anmeldung at Bürgerbüro).
+- **Implementation Details**:
+  - Write SQL scripts or Python functions to insert predefined steps into the `action_steps` table.
+  - Ensure each step has dependencies and conditional logic defined.
+- **Dependencies**: Database setup.
+
+#### **6. Integrate Langchain for AI Assistance**
+- **Description**: Set up Langchain in the backend to provide AI-powered responses to user queries.
+- **Implementation Details**:
+  - Use Langchain with Qdrant vector DB for semantic search over predefined knowledge base (e.g., FAQ about relocation).
+  - Implement endpoint (`POST /api/chat`) to handle user queries and return AI-generated responses.
+- **Dependencies**: Langchain setup.
+
+#### **7. Implement Notification Scheduler**
+- **Description**: Create a task scheduler using Celery or APScheduler to send reminders for upcoming steps.
+- **Implementation Details**:
+  - Define notification logic based on deadlines stored in the pipeline.
+  - Implement email or Telegram message sending via integrations.
+- **Dependencies**: Integration pipeline logic.
+
+---
+
+### **Frontend Tasks**
+
+#### **8. Set Up Frontend Framework**
+- **Description**: Initialize the frontend using React + Next.js. Create basic folder structure (`/src/components`, `/src/pages`, etc.).
+- **Implementation Details**:
+  - Install required libraries: `react`, `next`, `axios`.
+  - Set up routing with Next.js pages (e.g., `/dashboard`, `/onboarding`).
+- **Dependencies**: None.
+
+#### **9. Build User Onboarding Page**
+- **Description**: Create a page where users can fill out their profile (visa type, arrival date, etc.).
+- **Implementation Details**:
+  - Use React forms with validation (e.g., React Hook Form).
+  - Send data to backend via Axios (`POST /api/users`).
+- **Dependencies**: Backend User API.
+
+#### **10. Develop Pipeline Visualization**
+- **Description**: Build a dashboard page that displays the user's integration pipeline with steps and statuses.
+- **Implementation Details**:
+  - Use React components like cards or stepper UI to display steps dynamically fetched from backend (`GET /api/pipelines/{user_id}`).
+  - Include action buttons (e.g., "Mark as Complete").
+- **Dependencies**: Backend Pipeline API.
+
+#### **11. Implement Chatbot UI**
+- **Description**: Add a chatbot interface where users can ask questions about relocation steps.
+- **Implementation Details**:
+  - Use React chat components (e.g., Chat UI libraries).
+  - Send queries to backend via Axios (`POST /api/chat`) and display responses dynamically.
+- **Dependencies**: Backend Chat API.
+
+#### **12. Integrate Notifications**
+- **Description**: Display reminders and alerts in the frontend dashboard based on scheduled tasks.
+- **Implementation Details**:
+  - Fetch notifications from backend via Axios (`GET /api/tasks/upcoming`).
+  - Use toast notifications or alert banners in React.
+- **Dependencies**: Backend Notification Scheduler.
+
+---
+
+### **Telegram Bot Tasks**
+
+#### **13. Set Up Telegram Bot Framework**
+- **Description**: Initialize Telegram bot using Aiogram v3.0 in Python.
+- **Implementation Details**:
+  - Register bot token and webhook URL.
+  - Define basic commands (`/start`, `/help`).
+- **Dependencies**: None.
+
+#### **14. Implement User Interaction Logic**
+- **Description**: Handle user commands like `/pipeline` to fetch current integration steps from backend.
+- **Implementation Details**:
+  - Fetch data from backend (`GET /api/pipelines/{user_id}`) and format it into readable messages.
+  - Allow users to mark steps as complete via inline buttons.
+- **Dependencies**: Backend Pipeline API.
+
+#### **15. Schedule Alerts via Telegram**
+- **Description**: Send reminders about upcoming tasks directly to users via Telegram messages.
+- **Implementation Details**:
+  - Use Celery or APScheduler in backend to trigger alerts and send them via Telegram API.
+- **Dependencies**: Notification Scheduler.
+
+---
+
+### Final Notes
+
+1. Always specify whether tasks belong to the backend or frontend explicitly to avoid confusion for the AI Dev agent (e.g., "Backend Task" or "Frontend Task").
+2. Keep tasks simple and atomic; avoid combining multiple features into one task (e.g., separate chatbot UI creation from backend chatbot integration).
+3. Provide clear dependencies between tasks so the agent understands what needs to be completed first before moving forward.
