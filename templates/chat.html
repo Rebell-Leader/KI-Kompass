@@ -12,10 +12,25 @@
                 <div class="card-body p-0">
                     <div class="chat-container">
                         <div class="chat-messages" id="chat-messages">
-                            <!-- Chat messages will appear here -->
+                            {% if messages %}
+                                {% for message in messages %}
+                                <div class="message message-{{ message.role }}">
+                                    <div class="message-content">
+                                        {{ message.content|safe }}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="message message-assistant">
+                                    <div class="message-content">
+                                        Hello! I'm your Munich relocation assistant. How can I help you today?
+                                    </div>
+                                </div>
+                            {% endif %}
                         </div>
                         
                         <form id="chat-form" class="chat-input">
+                            <input type="hidden" id="conversation-id" value="{{ conversation_id }}">
                             <input type="text" id="chat-input" class="chat-input-field" placeholder="Ask me anything about relocating to Munich..." autocomplete="off">
                             <button type="submit" id="send-button" class="btn btn-primary">
                                 <i data-feather="send" style="width: 18px; height: 18px;"></i>
@@ -97,6 +112,12 @@
                 chatForm.dispatchEvent(new Event('submit'));
             });
         });
+
+        // Auto-scroll to bottom on page load
+        const chatMessages = document.getElementById('chat-messages');
+        if (chatMessages) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
     });
 </script>
 {% endblock %}

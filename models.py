@@ -1,5 +1,5 @@
 from datetime import datetime
-from app import db
+from database import db
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Float, JSON
 from sqlalchemy.orm import relationship
 
@@ -90,3 +90,44 @@ class TaskStatus(db.Model):
     
     def __repr__(self):
         return f"<TaskStatus {self.id} for step {self.action_step_id}>"
+
+
+class ChatMessage(db.Model):
+    __tablename__ = 'chat_messages'
+    
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    role = Column(String(16), nullable=False)  # 'user' or 'assistant'
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    conversation_id = Column(String(64), nullable=False)  # To group messages in a conversation
+    
+    # Define relationship to user
+    user = relationship("User", backref="chat_messages")
+    
+    def __repr__(self):
+        return f"<ChatMessage {self.id}: {self.role} - {self.content[:30]}...>"
+    
+    @classmethod
+    def get_conversation(cls, user_id, conversation_id, limit=50):
+        """Get all messages for a specific conversation"""
+        return cls.query.filter_by(
+            user_id=user_id, 
+            conversation_id=conversation_id
+        ).order_by(cls.created_at.asc()).limit(limit).all()
+    
+    @classmethod
+    def get_conversation_summary(cls, user_id, conversation_id):
+        """Get a summary of the conversation"""
+        user_messages = cls.query.filter_by(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            role="user"
+        ).order_by(cls.created_at.asc()).all()
+        
+        # Create a simple summary based on user messages
+        if not user_messages:
+            return "No conversation history"
+        
+        # Return the first few user messages as a summary
+        return ", ".join([m.content for m in user_messages[:3]])

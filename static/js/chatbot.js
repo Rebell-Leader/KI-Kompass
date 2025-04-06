@@ -15,6 +15,10 @@ function initChatbot() {
     const chatInput = document.getElementById('chat-input');
     const chatMessages = document.getElementById('chat-messages');
     const sendButton = document.getElementById('send-button');
+    const conversationIdInput = document.getElementById('conversation-id');
+    
+    // Store conversation ID across page reloads
+    let conversationId = conversationIdInput ? conversationIdInput.value : null;
     
     if (!chatForm || !chatInput || !chatMessages) {
         return;
@@ -40,13 +44,19 @@ function initChatbot() {
         // Add loading indicator
         const loadingId = addLoadingIndicator();
         
+        // Prepare request data with conversation ID if available
+        const requestData = { 
+            query: query,
+            conversation_id: conversationId
+        };
+        
         // Send message to server
         fetch('/api/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ query: query })
+            body: JSON.stringify(requestData)
         })
         .then(response => {
             if (!response.ok) {
@@ -59,7 +69,22 @@ function initChatbot() {
             removeLoadingIndicator(loadingId);
             
             // Add AI response to chat
-            addMessage('ai', data.response);
+            addMessage('assistant', data.response);
+            
+            // Store the conversation ID for future requests
+            conversationId = data.conversation_id;
+            
+            // Update hidden input with conversation ID
+            if (conversationIdInput && conversationId) {
+                conversationIdInput.value = conversationId;
+            }
+            
+            // Update URL with conversation ID for permalink/sharing without page reload
+            if (conversationId && window.history && window.history.replaceState) {
+                const url = new URL(window.location);
+                url.searchParams.set('conversation_id', conversationId);
+                window.history.replaceState({}, '', url);
+            }
             
             // Re-enable input and button
             chatInput.disabled = false;
@@ -71,7 +96,7 @@ function initChatbot() {
             removeLoadingIndicator(loadingId);
             
             // Add error message
-            addMessage('ai', 'Sorry, I encountered an error. Please try again later.');
+            addMessage('assistant', 'Sorry, I encountered an error. Please try again later.');
             
             console.error('Error:', error);
             
@@ -93,13 +118,15 @@ function initChatbot() {
     // Focus input on page load
     chatInput.focus();
     
-    // Add initial greeting
-    addMessage('ai', 'Hello! I\'m your KI Kompass assistant. How can I help you with your relocation to Munich today?');
+    // Check if we need to add an initial greeting (only if there are no messages)
+    if (chatMessages.children.length === 0) {
+        addMessage('assistant', 'Hello! I\'m your KI Kompass assistant. How can I help you with your relocation to Munich today?');
+    }
 }
 
 /**
  * Add a message to the chat
- * @param {string} type - 'user' or 'ai'
+ * @param {string} type - 'user' or 'assistant'
  * @param {string} text - Message text
  */
 function addMessage(type, text) {
@@ -107,7 +134,11 @@ function addMessage(type, text) {
     
     // Create message element
     const messageDiv = document.createElement('div');
-    messageDiv.classList.add('message', type === 'user' ? 'message-user' : 'message-ai');
+    messageDiv.classList.add('message', type === 'user' ? 'message-user' : 'message-assistant');
+    
+    // Create content container
+    const contentDiv = document.createElement('div');
+    contentDiv.classList.add('message-content');
     
     // Process text for links and formatting
     let processedText = text
@@ -115,11 +146,12 @@ function addMessage(type, text) {
         // Convert URLs to clickable links
         .replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
     
-    messageDiv.innerHTML = processedText;
+    contentDiv.innerHTML = processedText;
+    messageDiv.appendChild(contentDiv);
     
     // Add timestamp
     const timestamp = document.createElement('div');
-    timestamp.classList.add('message-meta');
+    timestamp.classList.add('message-timestamp');
     
     const now = new Date();
     timestamp.textContent = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -150,7 +182,7 @@ function addLoadingIndicator() {
     
     const loadingId = 'loading-' + Date.now();
     const loadingDiv = document.createElement('div');
-    loadingDiv.classList.add('message', 'message-ai', 'loading');
+    loadingDiv.classList.add('message', 'message-assistant', 'loading');
     loadingDiv.id = loadingId;
     
     loadingDiv.innerHTML = `

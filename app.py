@@ -1,43 +1,32 @@
 import os
+import uuid
+import logging
 from datetime import datetime
 from functools import wraps
 
 from flask import Flask, request, session, redirect, url_for, flash, render_template, jsonify
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from data.action_steps import populate_action_steps
+# Import database connection
+from database import db, init_db
+from services.ai_assistant import get_ai_response
 
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
-class Base(DeclarativeBase):
-    pass
-
-
-db = SQLAlchemy(model_class=Base)
+# Initialize Flask app
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "ki_kompass_secret_key")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-# Configure database
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-    "DATABASE_URL", 
-    f"postgresql://{os.environ.get('PGUSER', 'postgres')}:{os.environ.get('PGPASSWORD', 'postgres')}@{os.environ.get('PGHOST', 'localhost')}:{os.environ.get('PGPORT', '5432')}/{os.environ.get('PGDATABASE', 'kikompass')}"
-)
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+# Initialize database with app
+init_db(app)
 
-# Initialize database
-db.init_app(app)
-
-# Import models after db initialization to avoid circular imports
-from models import User, IntegrationPipeline, ActionStep, TaskStatus
+# Import models after db initialization
+from models import User, IntegrationPipeline, ActionStep, TaskStatus, ChatMessage
 from services.pipeline_engine import generate_pipeline
-from services.ai_assistant import get_ai_response
 
 # Login decorator
 def login_required(f):
@@ -261,21 +250,45 @@ def update_profile(user_id):
 @login_required
 def chat():
     user = User.query.get(session['user_id'])
-    return render_template('chat.html', user=user)
+    
+    # Get the conversation ID from the URL or create a new one
+    conversation_id = request.args.get('conversation_id')
+    
+    # Get conversation history if conversation_id is provided
+    messages = []
+    if conversation_id:
+        try:
+            messages = ChatMessage.get_conversation(user.id, conversation_id)
+        except Exception as e:
+            logger.error(f"Error retrieving chat history: {str(e)}")
+    
+    return render_template('chat.html', user=user, messages=messages, conversation_id=conversation_id)
 
 @app.route('/api/chat', methods=['POST'])
 @login_required
 def api_chat():
     user = User.query.get(session['user_id'])
     query = request.json.get('query', '')
+    conversation_id = request.json.get('conversation_id')
     
     if not query:
         return jsonify({"error": "No query provided"}), 400
     
-    # Get AI response using Langchain
-    response = get_ai_response(query, user)
-    
-    return jsonify({"response": response})
+    # Set a reasonable timeout for gunicorn
+    try:
+        # Get AI response using Langchain, with conversation memory
+        response, conversation_id = get_ai_response(query, user, conversation_id)
+        
+        return jsonify({
+            "response": response,
+            "conversation_id": conversation_id
+        })
+    except Exception as e:
+        logger.error(f"Chat API error: {str(e)}")
+        return jsonify({
+            "response": "Sorry, I'm having trouble processing your request right now. Please try again with a simpler question.",
+            "conversation_id": conversation_id or str(uuid.uuid4())
+        })
 
 @app.route('/api/task/update', methods=['POST'])
 @login_required
@@ -322,12 +335,7 @@ def update_task():
 from routers.users import users_bp
 app.register_blueprint(users_bp, name='users_blueprint')
 
-# Initialize database
-with app.app_context():
-    db.create_all()
-    # Populate action steps if they don't exist
-    if ActionStep.query.count() == 0:
-        populate_action_steps(db)
+# Database already initialized in database.py
 
 # Import routes after app is created
 # These imports will be used in a later stage to register blueprints
