@@ -1,0 +1,359 @@
+{% extends 'base.html' %}
+
+{% block title %}KI Kompass - Your Relocation Dashboard{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="dashboard-header mb-4">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="mb-2">Welcome, {{ user.full_name }}</h1>
+                <p class="text-muted">Your personalized journey to Munich, Germany</p>
+            </div>
+            <div class="col-md-4 text-md-right">
+                <div class="badge badge-primary py-1 px-2 mb-2">{{ user.visa_type|replace('_', ' ')|title }} Visa</div>
+                {% if user.arrival_date %}
+                    <div id="arrival-date" data-value="{{ user.arrival_date.isoformat() }}">
+                        {% if user.arrival_date > now %}
+                            <span class="badge badge-accent py-1 px-2">Arriving in {{ (user.arrival_date - now).days }} days</span>
+                        {% else %}
+                            <span class="badge badge-success py-1 px-2">Arrived {{ (now - user.arrival_date).days }} days ago</span>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="row dashboard-stats mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-value">{{ pipeline.progress|int }}%</div>
+                <div class="stat-label">Progress</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-value">{{ completed_tasks|length }}</div>
+                <div class="stat-label">Completed Tasks</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-value">{{ upcoming_tasks|length }}</div>
+                <div class="stat-label">Pending Tasks</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-value">
+                    {% if user.german_level and user.german_level != 'none' %}
+                        {{ user.german_level }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </div>
+                <div class="stat-label">German Level</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4 shadow-sm">
+                <div class="card-body">
+                    <div class="section-title mb-4">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h3 class="section-title-text mb-0">Your Integration Pipeline</h3>
+                            <div class="btn-group">
+                                <a href="#" class="btn btn-sm btn-outline active" id="view-list"><i data-feather="list"></i> List</a>
+                                <a href="#" class="btn btn-sm btn-outline" id="view-timeline"><i data-feather="calendar"></i> Timeline</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress mb-3">
+                        <div class="progress-bar" role="progressbar" style="width: {{ pipeline.progress }}%;" aria-valuenow="{{ pipeline.progress|int }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <div class="progress-label mb-4">
+                        <span>Overall Progress</span>
+                        <span class="progress-text">{{ pipeline.progress|int }}%</span>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <div class="btn-group">
+                                    <button class="btn btn-sm btn-outline filter-btn active" data-filter="all">All Tasks</button>
+                                    <button class="btn btn-sm btn-outline filter-btn" data-filter="pending">Pending</button>
+                                    <button class="btn btn-sm btn-outline filter-btn" data-filter="completed">Completed</button>
+                                </div>
+                            </div>
+                            <div>
+                                <select id="sort-tasks" class="form-control form-control-sm">
+                                    <option value="priority">Sort by Priority</option>
+                                    <option value="timeline">Sort by Timeline</option>
+                                    <option value="deadline">Sort by Deadline</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="step-list">
+                        {% for task in upcoming_tasks %}
+                            <div class="step-item" 
+                                data-category="{{ task.category }}" 
+                                data-timeline="{{ task.timeline_offset }}" 
+                                data-priority="{{ task.priority }}" 
+                                data-index="{{ loop.index }}"
+                                data-task-id="{{ task.id }}"
+                                {% if task.deadline %}data-deadline="{{ task.deadline }}"{% endif %}>
+                                <div class="step-icon" data-number="{{ loop.index }}">{{ loop.index }}</div>
+                                <div class="step-content">
+                                    <div class="step-title">
+                                        <h5 class="step-title-text mb-0">{{ task.title }}</h5>
+                                        {% if task.deadline %}
+                                            <span class="step-deadline {% if (task.deadline - now).days < 7 %}urgent{% endif %}">
+                                                Due in {{ (task.deadline - now).days }} days
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <p class="mb-2">{{ task.description }}</p>
+                                    
+                                    <div class="step-details" style="display: none;">
+                                        <div class="card mb-3 bg-light">
+                                            <div class="card-body p-3">
+                                                <h6 class="mb-2">Instructions:</h6>
+                                                <p class="mb-0">{{ task.instructions }}</p>
+                                            </div>
+                                        </div>
+                                        
+                                        {% if task.required_documents %}
+                                            <div class="mb-3">
+                                                <h6 class="mb-2">Required Documents:</h6>
+                                                <ul>
+                                                    {% for doc in task.required_documents %}
+                                                        <li>{{ doc }}</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        {% if task.address %}
+                                            <div class="mb-3">
+                                                <h6 class="mb-2">Address:</h6>
+                                                <p class="mb-0">{{ task.address }}</p>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        {% if task.url %}
+                                            <div class="mb-3">
+                                                <h6 class="mb-2">Useful Link:</h6>
+                                                <a href="{{ task.url }}" target="_blank" rel="noopener noreferrer">{{ task.url }}</a>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        <div class="form-group mb-0">
+                                            <label for="task-notes-{{ task.id }}" class="form-label">Your Notes:</label>
+                                            <textarea id="task-notes-{{ task.id }}" class="form-control task-notes" data-task-id="{{ task.id }}" rows="2" placeholder="Add your notes here..."></textarea>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mt-3 d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <span class="badge badge-primary">{{ task.category }}</span>
+                                            {% if task.priority == 1 %}
+                                                <span class="badge badge-danger">High Priority</span>
+                                            {% elif task.priority == 2 %}
+                                                <span class="badge badge-warning">Medium Priority</span>
+                                            {% else %}
+                                                <span class="badge badge-info">Low Priority</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="step-actions">
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input task-checkbox" id="task-{{ task.id }}" data-task-id="{{ task.id }}" {% if task.completed %}checked{% endif %}>
+                                                <label class="form-check-label" for="task-{{ task.id }}">Mark as complete</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                        
+                        {% if completed_tasks %}
+                            {% for task in completed_tasks %}
+                                <div class="step-item completed" 
+                                    data-category="{{ task.category }}" 
+                                    data-timeline="{{ task.timeline_offset }}" 
+                                    data-priority="{{ task.priority }}" 
+                                    data-index="{{ loop.index + upcoming_tasks|length }}"
+                                    data-task-id="{{ task.id }}">
+                                    <div class="step-icon completed" data-number="{{ loop.index + upcoming_tasks|length }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    </div>
+                                    <div class="step-content">
+                                        <div class="step-title">
+                                            <h5 class="step-title-text mb-0">{{ task.title }}</h5>
+                                            <span class="text-success">Completed</span>
+                                        </div>
+                                        <p class="mb-2">{{ task.description }}</p>
+                                        
+                                        <div class="step-details" style="display: none;">
+                                            <div class="card mb-3 bg-light">
+                                                <div class="card-body p-3">
+                                                    <h6 class="mb-2">Instructions:</h6>
+                                                    <p class="mb-0">{{ task.instructions }}</p>
+                                                </div>
+                                            </div>
+                                            
+                                            {% if task.required_documents %}
+                                                <div class="mb-3">
+                                                    <h6 class="mb-2">Required Documents:</h6>
+                                                    <ul>
+                                                        {% for doc in task.required_documents %}
+                                                            <li>{{ doc }}</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            {% endif %}
+                                            
+                                            {% if task.address %}
+                                                <div class="mb-3">
+                                                    <h6 class="mb-2">Address:</h6>
+                                                    <p class="mb-0">{{ task.address }}</p>
+                                                </div>
+                                            {% endif %}
+                                            
+                                            {% if task.url %}
+                                                <div class="mb-3">
+                                                    <h6 class="mb-2">Useful Link:</h6>
+                                                    <a href="{{ task.url }}" target="_blank" rel="noopener noreferrer">{{ task.url }}</a>
+                                                </div>
+                                            {% endif %}
+                                            
+                                            <div class="form-group mb-0">
+                                                <label for="task-notes-{{ task.id }}" class="form-label">Your Notes:</label>
+                                                <textarea id="task-notes-{{ task.id }}" class="form-control task-notes" data-task-id="{{ task.id }}" rows="2" placeholder="Add your notes here..."></textarea>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mt-3 d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span class="badge badge-primary">{{ task.category }}</span>
+                                            </div>
+                                            <div class="step-actions">
+                                                <div class="form-check">
+                                                    <input type="checkbox" class="form-check-input task-checkbox" id="task-{{ task.id }}" data-task-id="{{ task.id }}" checked>
+                                                    <label class="form-check-label" for="task-{{ task.id }}">Completed</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    
+                    <div class="timeline-view" style="display: none;">
+                        <div class="timeline-container">
+                            <!-- Timeline will be generated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card mb-4 shadow-sm">
+                <div class="card-body">
+                    <h3 class="mb-3">Quick Actions</h3>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('chat') }}" class="btn btn-primary mb-2">
+                            <i data-feather="message-circle" style="width: 18px; height: 18px; margin-right: 8px;"></i>
+                            Ask AI Assistant
+                        </a>
+                        <a href="{{ url_for('profile') }}" class="btn btn-outline mb-2">
+                            <i data-feather="user" style="width: 18px; height: 18px; margin-right: 8px;"></i>
+                            Update Profile
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4 shadow-sm">
+                <div class="card-body">
+                    <h3 class="mb-3">Upcoming Deadlines</h3>
+                    
+                    {% set has_deadlines = false %}
+                    {% for task in upcoming_tasks %}
+                        {% if task.deadline and not task.completed %}
+                            {% set has_deadlines = true %}
+                            <div class="d-flex align-items-center mb-3 p-2 {% if (task.deadline - now).days < 7 %}bg-light rounded{% endif %}">
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background-color: {% if (task.deadline - now).days < 7 %}var(--danger){% else %}var(--primary){% endif %}; color: var(--secondary); display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                                    <i data-feather="calendar" style="width: 18px; height: 18px;"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0">{{ task.title }}</h6>
+                                    <p class="mb-0 {% if (task.deadline - now).days < 7 %}text-danger{% else %}text-muted{% endif %}">
+                                        Due in {{ (task.deadline - now).days }} days
+                                    </p>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if not has_deadlines %}
+                        <p class="text-muted">No upcoming deadlines at the moment.</p>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="card mb-4 shadow-sm">
+                <div class="card-body">
+                    <h3 class="mb-3">Helpful Resources</h3>
+                    <ul class="list-unstyled">
+                        <li class="mb-3">
+                            <a href="https://www.muenchen.de/int/en.html" target="_blank" rel="noopener noreferrer" class="d-flex align-items-center">
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background-color: var(--accent); color: var(--text); display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                                    <i data-feather="globe" style="width: 18px; height: 18px;"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0">Munich Official Website</h6>
+                                    <p class="mb-0 text-muted">Official city portal with essential information</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li class="mb-3">
+                            <a href="https://www.mvv-muenchen.de/en/" target="_blank" rel="noopener noreferrer" class="d-flex align-items-center">
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background-color: var(--accent); color: var(--text); display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                                    <i data-feather="map" style="width: 18px; height: 18px;"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0">Munich Public Transport (MVV)</h6>
+                                    <p class="mb-0 text-muted">Public transportation information and tickets</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="https://www.make-it-in-germany.com/en/" target="_blank" rel="noopener noreferrer" class="d-flex align-items-center">
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background-color: var(--accent); color: var(--text); display: flex; align-items: center; justify-content: center; margin-right: 12px;">
+                                    <i data-feather="info" style="width: 18px; height: 18px;"></i>
+                                </div>
+                                <div>
+                                    <h6 class="mb-0">Make it in Germany</h6>
+                                    <p class="mb-0 text-muted">Official portal for international professionals</p>
+                                </div>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/pipeline.js') }}"></script>
+{% endblock %}

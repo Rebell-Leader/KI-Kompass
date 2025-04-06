@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+
+{% block title %}KI Kompass - Your Munich Relocation Assistant{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row py-5">
+        <div class="col-12 col-md-6 d-flex flex-column justify-content-center">
+            <h1 class="mb-3">Welcome to KI Kompass</h1>
+            <p class="mb-4">Your AI-powered relocation assistant to guide you through settling in Munich, Germany. Get personalized integration pipelines, step-by-step guidance, and expert assistance for a smooth transition to your new home.</p>
+            
+            <div class="row mb-4">
+                <div class="col-6">
+                    <div class="card p-3 shadow-sm text-center">
+                        <div style="color: var(--primary); margin-bottom: 12px;">
+                            <i data-feather="check-circle" width="32" height="32"></i>
+                        </div>
+                        <h5 class="mb-1">Personalized Guidance</h5>
+                        <p class="mb-0 text-muted">Custom relocation pipelines based on your profile</p>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="card p-3 shadow-sm text-center">
+                        <div style="color: var(--primary); margin-bottom: 12px;">
+                            <i data-feather="message-circle" width="32" height="32"></i>
+                        </div>
+                        <h5 class="mb-1">AI Assistance</h5>
+                        <p class="mb-0 text-muted">Get answers to your relocation questions</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card mb-4">
+                <div class="card-body">
+                    <ul class="nav nav-tabs" id="authTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" id="login-tab" data-bs-toggle="tab" href="#login" role="tab" aria-controls="login" aria-selected="true">Login</a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="register-tab" data-bs-toggle="tab" href="#register" role="tab" aria-controls="register" aria-selected="false">Register</a>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content py-3" id="authTabsContent">
+                        <!-- Login Form -->
+                        <div class="tab-pane fade show active" id="login" role="tabpanel" aria-labelledby="login-tab">
+                            <form action="{{ url_for('login') }}" method="POST">
+                                <div class="form-group mb-3">
+                                    <label for="login-email" class="form-label">Email</label>
+                                    <input type="email" id="login-email" name="email" class="form-control" required>
+                                </div>
+                                <div class="form-group mb-4">
+                                    <label for="login-password" class="form-label">Password</label>
+                                    <input type="password" id="login-password" name="password" class="form-control" required>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Login</button>
+                            </form>
+                        </div>
+                        
+                        <!-- Register Form -->
+                        <div class="tab-pane fade" id="register" role="tabpanel" aria-labelledby="register-tab">
+                            <form action="{{ url_for('register') }}" method="POST">
+                                <div class="form-group mb-3">
+                                    <label for="register-username" class="form-label">Username</label>
+                                    <input type="text" id="register-username" name="username" class="form-control" required>
+                                </div>
+                                <div class="form-group mb-3">
+                                    <label for="register-email" class="form-label">Email</label>
+                                    <input type="email" id="register-email" name="email" class="form-control" required>
+                                </div>
+                                <div class="form-group mb-4">
+                                    <label for="register-password" class="form-label">Password</label>
+                                    <input type="password" id="register-password" name="password" class="form-control" required minlength="8">
+                                    <small class="form-text text-muted">Password must be at least 8 characters long</small>
+                                </div>
+                                <button type="submit" class="btn btn-primary w-100">Create Account</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-12 col-md-6">
+            <div class="card shadow">
+                <div class="card-body p-4">
+                    <h3 class="mb-4 text-center">How KI Kompass Works</h3>
+                    
+                    <div class="step-list">
+                        <div class="step-item">
+                            <div class="step-icon">1</div>
+                            <div class="step-content">
+                                <h5>Create Your Profile</h5>
+                                <p>Tell us about your situation - visa type, arrival date, family status, and more. We'll tailor everything to your specific needs.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="step-item">
+                            <div class="step-icon">2</div>
+                            <div class="step-content">
+                                <h5>Get Your Personalized Pipeline</h5>
+                                <p>We'll create a customized step-by-step plan for your relocation journey, with all the essential bureaucratic processes for settling in Munich.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="step-item">
+                            <div class="step-icon">3</div>
+                            <div class="step-content">
+                                <h5>Track Your Progress</h5>
+                                <p>Follow your progress, get reminders for important deadlines, and mark tasks as complete as you settle into your new home.</p>
+                            </div>
+                        </div>
+                        
+                        <div class="step-item">
+                            <div class="step-icon">4</div>
+                            <div class="step-content">
+                                <h5>Get AI-Powered Support</h5>
+                                <p>Ask our intelligent assistant any questions about relocating to Munich and get accurate, helpful answers at any time.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-center mt-4">
+                        <div class="badge badge-accent mb-2">Trusted by relocators</div>
+                        <p class="mb-0"><strong>Join hundreds of newcomers who made their move to Munich smoother with KI Kompass</strong></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Features Section -->
+    <div class="py-5">
+        <h2 class="text-center mb-5">Why Choose KI Kompass</h2>
+        
+        <div class="row">
+            <div class="col-12 col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center p-4">
+                        <div style="color: var(--primary); margin-bottom: 16px;">
+                            <i data-feather="map" width="48" height="48"></i>
+                        </div>
+                        <h4>Personalized Roadmap</h4>
+                        <p>Get a tailored integration plan based on your visa type, arrival date, family status, and employment situation.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-12 col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center p-4">
+                        <div style="color: var(--primary); margin-bottom: 16px;">
+                            <i data-feather="clipboard" width="48" height="48"></i>
+                        </div>
+                        <h4>Step-by-Step Guidance</h4>
+                        <p>Clear instructions for registration, tax ID, residence permit, health insurance, and other essential processes.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-12 col-md-4 mb-4">
+                <div class="card h-100">
+                    <div class="card-body text-center p-4">
+                        <div style="color: var(--primary); margin-bottom: 16px;">
+                            <i data-feather="help-circle" width="48" height="48"></i>
+                        </div>
+                        <h4>AI-Powered Support</h4>
+                        <p>Ask questions about relocating to Munich and get immediate, accurate answers from our AI assistant.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Simple tab functionality for login/register forms
+    document.addEventListener('DOMContentLoaded', function() {
+        const loginTab = document.getElementById('login-tab');
+        const registerTab = document.getElementById('register-tab');
+        const loginPane = document.getElementById('login');
+        const registerPane = document.getElementById('register');
+        
+        loginTab.addEventListener('click', function(e) {
+            e.preventDefault();
+            loginTab.classList.add('active');
+            registerTab.classList.remove('active');
+            loginPane.classList.add('show', 'active');
+            registerPane.classList.remove('show', 'active');
+        });
+        
+        registerTab.addEventListener('click', function(e) {
+            e.preventDefault();
+            registerTab.classList.add('active');
+            loginTab.classList.remove('active');
+            registerPane.classList.add('show', 'active');
+            loginPane.classList.remove('show', 'active');
+        });
+    });
+</script>
+{% endblock %}

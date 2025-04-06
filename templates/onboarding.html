@@ -1,0 +1,421 @@
+{% extends 'base.html' %}
+
+{% block title %}KI Kompass - Complete Your Profile{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="onboarding-container py-4">
+        <h1 class="text-center mb-5">Complete Your Profile</h1>
+        
+        <div class="step-tracker mb-5">
+            <div class="step-tracker-item">
+                <div class="step-tracker-icon active">
+                    <i data-feather="user"></i>
+                </div>
+                <div class="step-tracker-label">Personal Info</div>
+            </div>
+            <div class="step-tracker-item">
+                <div class="step-tracker-icon">
+                    <i data-feather="briefcase"></i>
+                </div>
+                <div class="step-tracker-label">Employment</div>
+            </div>
+            <div class="step-tracker-item">
+                <div class="step-tracker-icon">
+                    <i data-feather="home"></i>
+                </div>
+                <div class="step-tracker-label">Family</div>
+            </div>
+            <div class="step-tracker-item">
+                <div class="step-tracker-icon">
+                    <i data-feather="check-circle"></i>
+                </div>
+                <div class="step-tracker-label">Complete</div>
+            </div>
+        </div>
+        
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <form action="{{ url_for('onboarding') }}" method="POST" id="onboarding-form">
+                    <!-- Step 1: Personal Information -->
+                    <div class="onboarding-section active" id="step-1">
+                        <h3 class="mb-4">Personal Information</h3>
+                        
+                        <div class="form-group mb-3">
+                            <label for="full_name" class="form-label">Full Name</label>
+                            <input type="text" id="full_name" name="full_name" class="form-control" value="{{ user.full_name or '' }}" required>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="nationality" class="form-label">Nationality</label>
+                            <select id="nationality" name="nationality" class="form-control" required>
+                                <option value="" disabled {% if not user.nationality %}selected{% endif %}>Select your nationality</option>
+                                <option value="USA" {% if user.nationality == 'USA' %}selected{% endif %}>United States</option>
+                                <option value="IND" {% if user.nationality == 'IND' %}selected{% endif %}>India</option>
+                                <option value="CHN" {% if user.nationality == 'CHN' %}selected{% endif %}>China</option>
+                                <option value="RUS" {% if user.nationality == 'RUS' %}selected{% endif %}>Russia</option>
+                                <option value="GBR" {% if user.nationality == 'GBR' %}selected{% endif %}>United Kingdom</option>
+                                <option value="CAN" {% if user.nationality == 'CAN' %}selected{% endif %}>Canada</option>
+                                <option value="AUS" {% if user.nationality == 'AUS' %}selected{% endif %}>Australia</option>
+                                <option value="BRA" {% if user.nationality == 'BRA' %}selected{% endif %}>Brazil</option>
+                                <option value="TUR" {% if user.nationality == 'TUR' %}selected{% endif %}>Turkey</option>
+                                <option value="Other" {% if user.nationality and user.nationality not in ['USA', 'IND', 'CHN', 'RUS', 'GBR', 'CAN', 'AUS', 'BRA', 'TUR'] %}selected{% endif %}>Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="visa_type" class="form-label">Visa Type</label>
+                            <select id="visa_type" name="visa_type" class="form-control" required>
+                                <option value="" disabled {% if not user.visa_type %}selected{% endif %}>Select your visa type</option>
+                                <option value="work" {% if user.visa_type == 'work' %}selected{% endif %}>Work Visa</option>
+                                <option value="blue_card" {% if user.visa_type == 'blue_card' %}selected{% endif %}>EU Blue Card</option>
+                                <option value="study" {% if user.visa_type == 'study' %}selected{% endif %}>Student Visa</option>
+                                <option value="family_reunion" {% if user.visa_type == 'family_reunion' %}selected{% endif %}>Family Reunion Visa</option>
+                                <option value="job_seeker" {% if user.visa_type == 'job_seeker' %}selected{% endif %}>Job Seeker Visa</option>
+                                <option value="eu_citizen" {% if user.visa_type == 'eu_citizen' %}selected{% endif %}>EU Citizen (No Visa Required)</option>
+                                <option value="other" {% if user.visa_type and user.visa_type not in ['work', 'blue_card', 'study', 'family_reunion', 'job_seeker', 'eu_citizen'] %}selected{% endif %}>Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="arrival_date" class="form-label">Arrival Date in Germany</label>
+                            <input type="date" id="arrival_date" name="arrival_date" class="form-control" value="{{ user.arrival_date.strftime('%Y-%m-%d') if user.arrival_date else '' }}" required>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="german_level" class="form-label">German Language Level</label>
+                            <select id="german_level" name="german_level" class="form-control" required>
+                                <option value="" disabled {% if not user.german_level %}selected{% endif %}>Select your German level</option>
+                                <option value="none" {% if user.german_level == 'none' %}selected{% endif %}>No knowledge</option>
+                                <option value="A1" {% if user.german_level == 'A1' %}selected{% endif %}>A1 - Beginner</option>
+                                <option value="A2" {% if user.german_level == 'A2' %}selected{% endif %}>A2 - Elementary</option>
+                                <option value="B1" {% if user.german_level == 'B1' %}selected{% endif %}>B1 - Intermediate</option>
+                                <option value="B2" {% if user.german_level == 'B2' %}selected{% endif %}>B2 - Upper Intermediate</option>
+                                <option value="C1" {% if user.german_level == 'C1' %}selected{% endif %}>C1 - Advanced</option>
+                                <option value="C2" {% if user.german_level == 'C2' %}selected{% endif %}>C2 - Proficient</option>
+                                <option value="native" {% if user.german_level == 'native' %}selected{% endif %}>Native Speaker</option>
+                            </select>
+                        </div>
+                        
+                        <div class="onboarding-actions">
+                            <div></div> <!-- Empty div for spacing -->
+                            <button type="button" class="btn btn-primary" data-step="2">Continue <i data-feather="arrow-right" style="width: 18px; height: 18px; margin-left: 4px;"></i></button>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 2: Employment Information -->
+                    <div class="onboarding-section" id="step-2">
+                        <h3 class="mb-4">Employment Information</h3>
+                        
+                        <div class="form-group mb-3">
+                            <label for="employment_status" class="form-label">Employment Status</label>
+                            <select id="employment_status" name="employment_status" class="form-control" required>
+                                <option value="" disabled {% if not user.employment_status %}selected{% endif %}>Select your employment status</option>
+                                <option value="employed" {% if user.employment_status == 'employed' %}selected{% endif %}>Employed</option>
+                                <option value="self-employed" {% if user.employment_status == 'self-employed' %}selected{% endif %}>Self-employed</option>
+                                <option value="student" {% if user.employment_status == 'student' %}selected{% endif %}>Student</option>
+                                <option value="job_seeking" {% if user.employment_status == 'job_seeking' %}selected{% endif %}>Job seeking</option>
+                                <option value="retired" {% if user.employment_status == 'retired' %}selected{% endif %}>Retired</option>
+                                <option value="other" {% if user.employment_status and user.employment_status not in ['employed', 'self-employed', 'student', 'job_seeking', 'retired'] %}selected{% endif %}>Other</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group mb-4 employment-details" style="display: none;">
+                            <label for="employer_name" class="form-label">Employer Name (Optional)</label>
+                            <input type="text" id="employer_name" name="employer_name" class="form-control">
+                            <small class="form-text text-muted">This information can help us provide more specific guidance on work-related requirements.</small>
+                        </div>
+                        
+                        <div class="alert alert-info mb-4">
+                            <div class="d-flex align-items-center">
+                                <i data-feather="info" style="width: 24px; height: 24px; margin-right: 12px;"></i>
+                                <div>
+                                    <strong>Why do we ask about employment?</strong>
+                                    <p class="mb-0">Your employment status affects certain relocation requirements, such as health insurance options and residence permit types.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="onboarding-actions">
+                            <button type="button" class="btn btn-outline" data-step="1"><i data-feather="arrow-left" style="width: 18px; height: 18px; margin-right: 4px;"></i> Back</button>
+                            <button type="button" class="btn btn-primary" data-step="3">Continue <i data-feather="arrow-right" style="width: 18px; height: 18px; margin-left: 4px;"></i></button>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 3: Family Information -->
+                    <div class="onboarding-section" id="step-3">
+                        <h3 class="mb-4">Family Information</h3>
+                        
+                        <div class="form-group mb-3">
+                            <label class="form-label">Are you relocating with family members?</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="has_family" id="has_family_yes" value="yes" {% if user.has_family %}checked{% endif %} required>
+                                <label class="form-check-label" for="has_family_yes">Yes</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="has_family" id="has_family_no" value="no" {% if user.has_family is defined and not user.has_family %}checked{% endif %} required>
+                                <label class="form-check-label" for="has_family_no">No</label>
+                            </div>
+                        </div>
+                        
+                        <div class="family-details" style="{% if not user.has_family %}display: none;{% endif %}">
+                            <div class="form-group mb-3">
+                                <label for="spouse_nationality" class="form-label">Spouse's Nationality (if applicable)</label>
+                                <select id="spouse_nationality" name="spouse_nationality" class="form-control">
+                                    <option value="" {% if not user.spouse_nationality %}selected{% endif %}>Select nationality</option>
+                                    <option value="USA" {% if user.spouse_nationality == 'USA' %}selected{% endif %}>United States</option>
+                                    <option value="IND" {% if user.spouse_nationality == 'IND' %}selected{% endif %}>India</option>
+                                    <option value="CHN" {% if user.spouse_nationality == 'CHN' %}selected{% endif %}>China</option>
+                                    <option value="RUS" {% if user.spouse_nationality == 'RUS' %}selected{% endif %}>Russia</option>
+                                    <option value="GBR" {% if user.spouse_nationality == 'GBR' %}selected{% endif %}>United Kingdom</option>
+                                    <option value="CAN" {% if user.spouse_nationality == 'CAN' %}selected{% endif %}>Canada</option>
+                                    <option value="AUS" {% if user.spouse_nationality == 'AUS' %}selected{% endif %}>Australia</option>
+                                    <option value="BRA" {% if user.spouse_nationality == 'BRA' %}selected{% endif %}>Brazil</option>
+                                    <option value="TUR" {% if user.spouse_nationality == 'TUR' %}selected{% endif %}>Turkey</option>
+                                    <option value="DEU" {% if user.spouse_nationality == 'DEU' %}selected{% endif %}>Germany</option>
+                                    <option value="Other" {% if user.spouse_nationality and user.spouse_nationality not in ['USA', 'IND', 'CHN', 'RUS', 'GBR', 'CAN', 'AUS', 'BRA', 'TUR', 'DEU'] %}selected{% endif %}>Other</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group mb-3">
+                                <label for="num_children" class="form-label">Number of Children (if any)</label>
+                                <select id="num_children" name="num_children" class="form-control">
+                                    <option value="0" {% if user.num_children == 0 %}selected{% endif %}>0</option>
+                                    <option value="1" {% if user.num_children == 1 %}selected{% endif %}>1</option>
+                                    <option value="2" {% if user.num_children == 2 %}selected{% endif %}>2</option>
+                                    <option value="3" {% if user.num_children == 3 %}selected{% endif %}>3</option>
+                                    <option value="4" {% if user.num_children == 4 %}selected{% endif %}>4</option>
+                                    <option value="5" {% if user.num_children >= 5 %}selected{% endif %}>5 or more</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info mb-4">
+                            <div class="d-flex align-items-center">
+                                <i data-feather="info" style="width: 24px; height: 24px; margin-right: 12px;"></i>
+                                <div>
+                                    <strong>Why do we ask about family?</strong>
+                                    <p class="mb-0">Family members require additional registration, residence permits, and may need school/daycare arrangements. This helps us customize your relocation plan.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="onboarding-actions">
+                            <button type="button" class="btn btn-outline" data-step="2"><i data-feather="arrow-left" style="width: 18px; height: 18px; margin-right: 4px;"></i> Back</button>
+                            <button type="button" class="btn btn-primary" data-step="4">Continue <i data-feather="arrow-right" style="width: 18px; height: 18px; margin-left: 4px;"></i></button>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 4: Review and Submit -->
+                    <div class="onboarding-section" id="step-4">
+                        <h3 class="mb-4">Review Your Information</h3>
+                        
+                        <div class="card mb-4 bg-light">
+                            <div class="card-body">
+                                <h5 class="card-title mb-3">Personal Information</h5>
+                                <div class="row mb-2">
+                                    <div class="col-4"><strong>Full Name:</strong></div>
+                                    <div class="col-8" id="review-full-name"></div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-4"><strong>Nationality:</strong></div>
+                                    <div class="col-8" id="review-nationality"></div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-4"><strong>Visa Type:</strong></div>
+                                    <div class="col-8" id="review-visa-type"></div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-4"><strong>Arrival Date:</strong></div>
+                                    <div class="col-8" id="review-arrival-date"></div>
+                                </div>
+                                <div class="row mb-2">
+                                    <div class="col-4"><strong>German Level:</strong></div>
+                                    <div class="col-8" id="review-german-level"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-4 bg-light">
+                            <div class="card-body">
+                                <h5 class="card-title mb-3">Employment Information</h5>
+                                <div class="row mb-2">
+                                    <div class="col-4"><strong>Employment Status:</strong></div>
+                                    <div class="col-8" id="review-employment-status"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card mb-4 bg-light">
+                            <div class="card-body">
+                                <h5 class="card-title mb-3">Family Information</h5>
+                                <div class="row mb-2">
+                                    <div class="col-4"><strong>Relocating with Family:</strong></div>
+                                    <div class="col-8" id="review-has-family"></div>
+                                </div>
+                                <div class="family-review" style="display: none;">
+                                    <div class="row mb-2">
+                                        <div class="col-4"><strong>Spouse Nationality:</strong></div>
+                                        <div class="col-8" id="review-spouse-nationality"></div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-4"><strong>Number of Children:</strong></div>
+                                        <div class="col-8" id="review-num-children"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-primary mb-4">
+                            <div class="d-flex align-items-center">
+                                <i data-feather="alert-circle" style="width: 24px; height: 24px; margin-right: 12px;"></i>
+                                <div>
+                                    <strong>Almost there!</strong>
+                                    <p class="mb-0">Please review your information carefully. After submission, we'll create your personalized relocation pipeline.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="onboarding-actions">
+                            <button type="button" class="btn btn-outline" data-step="3"><i data-feather="arrow-left" style="width: 18px; height: 18px; margin-right: 4px;"></i> Back</button>
+                            <button type="submit" class="btn btn-primary">Submit and Create My Plan <i data-feather="check-circle" style="width: 18px; height: 18px; margin-left: 4px;"></i></button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Step navigation
+        const stepButtons = document.querySelectorAll('[data-step]');
+        const sections = document.querySelectorAll('.onboarding-section');
+        const stepIcons = document.querySelectorAll('.step-tracker-icon');
+        
+        stepButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const targetStep = this.getAttribute('data-step');
+                
+                // Hide all sections
+                sections.forEach(section => {
+                    section.classList.remove('active');
+                });
+                
+                // Show target section
+                document.getElementById(`step-${targetStep}`).classList.add('active');
+                
+                // Update step tracker
+                stepIcons.forEach((icon, index) => {
+                    if (index + 1 < targetStep) {
+                        icon.classList.add('completed');
+                        icon.classList.remove('active');
+                        icon.innerHTML = '<i data-feather="check"></i>';
+                    } else if (index + 1 == targetStep) {
+                        icon.classList.add('active');
+                        icon.classList.remove('completed');
+                        // Reset to original icon
+                        switch(index) {
+                            case 0: icon.innerHTML = '<i data-feather="user"></i>'; break;
+                            case 1: icon.innerHTML = '<i data-feather="briefcase"></i>'; break;
+                            case 2: icon.innerHTML = '<i data-feather="home"></i>'; break;
+                            case 3: icon.innerHTML = '<i data-feather="check-circle"></i>'; break;
+                        }
+                    } else {
+                        icon.classList.remove('active', 'completed');
+                        // Reset to original icon
+                        switch(index) {
+                            case 0: icon.innerHTML = '<i data-feather="user"></i>'; break;
+                            case 1: icon.innerHTML = '<i data-feather="briefcase"></i>'; break;
+                            case 2: icon.innerHTML = '<i data-feather="home"></i>'; break;
+                            case 3: icon.innerHTML = '<i data-feather="check-circle"></i>'; break;
+                        }
+                    }
+                });
+                
+                // Update feather icons
+                feather.replace();
+                
+                // If going to review step, populate review data
+                if (targetStep === "4") {
+                    updateReviewData();
+                }
+            });
+        });
+        
+        // Toggle family details based on radio selection
+        const familyRadios = document.querySelectorAll('input[name="has_family"]');
+        const familyDetails = document.querySelector('.family-details');
+        
+        familyRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'yes') {
+                    familyDetails.style.display = 'block';
+                } else {
+                    familyDetails.style.display = 'none';
+                }
+            });
+        });
+        
+        // Toggle employment details based on select
+        const employmentSelect = document.getElementById('employment_status');
+        const employmentDetails = document.querySelector('.employment-details');
+        
+        employmentSelect.addEventListener('change', function() {
+            if (this.value === 'employed' || this.value === 'self-employed') {
+                employmentDetails.style.display = 'block';
+            } else {
+                employmentDetails.style.display = 'none';
+            }
+        });
+        
+        // Trigger change event to set initial state
+        if (employmentSelect.value === 'employed' || employmentSelect.value === 'self-employed') {
+            employmentDetails.style.display = 'block';
+        }
+        
+        // Function to update review data
+        function updateReviewData() {
+            // Personal information
+            document.getElementById('review-full-name').textContent = document.getElementById('full_name').value;
+            
+            const nationalitySelect = document.getElementById('nationality');
+            document.getElementById('review-nationality').textContent = nationalitySelect.options[nationalitySelect.selectedIndex].text;
+            
+            const visaTypeSelect = document.getElementById('visa_type');
+            document.getElementById('review-visa-type').textContent = visaTypeSelect.options[visaTypeSelect.selectedIndex].text;
+            
+            const arrivalDate = new Date(document.getElementById('arrival_date').value);
+            document.getElementById('review-arrival-date').textContent = arrivalDate.toLocaleDateString();
+            
+            const germanLevelSelect = document.getElementById('german_level');
+            document.getElementById('review-german-level').textContent = germanLevelSelect.options[germanLevelSelect.selectedIndex].text;
+            
+            // Employment information
+            const employmentStatusSelect = document.getElementById('employment_status');
+            document.getElementById('review-employment-status').textContent = employmentStatusSelect.options[employmentStatusSelect.selectedIndex].text;
+            
+            // Family information
+            const hasFamily = document.querySelector('input[name="has_family"]:checked').value;
+            document.getElementById('review-has-family').textContent = hasFamily === 'yes' ? 'Yes' : 'No';
+            
+            const familyReview = document.querySelector('.family-review');
+            if (hasFamily === 'yes') {
+                familyReview.style.display = 'block';
+                
+                const spouseNationalitySelect = document.getElementById('spouse_nationality');
+                document.getElementById('review-spouse-nationality').textContent = 
+                    spouseNationalitySelect.value ? spouseNationalitySelect.options[spouseNationalitySelect.selectedIndex].text : 'N/A';
+                
+                const numChildrenSelect = document.getElementById('num_children');
+                document.getElementById('review-num-children').textContent = numChildrenSelect.options[numChildrenSelect.selectedIndex].text;
+            } else {
+                familyReview.style.display = 'none';
+            }
+        }
+    });
+</script>
+{% endblock %}

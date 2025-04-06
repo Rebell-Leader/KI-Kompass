@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+
+{% block title %}KI Kompass - AI Assistant{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <h1 class="mb-4">AI Relocation Assistant</h1>
+            
+            <div class="card shadow mb-4">
+                <div class="card-body p-0">
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chat-messages">
+                            <!-- Chat messages will appear here -->
+                        </div>
+                        
+                        <form id="chat-form" class="chat-input">
+                            <input type="text" id="chat-input" class="chat-input-field" placeholder="Ask me anything about relocating to Munich..." autocomplete="off">
+                            <button type="submit" id="send-button" class="btn btn-primary">
+                                <i data-feather="send" style="width: 18px; height: 18px;"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h4 class="mb-3">Sample Questions You Can Ask</h4>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-2">
+                                <a href="#" class="sample-question text-primary">
+                                    <i data-feather="help-circle" style="width: 16px; height: 16px; margin-right: 4px;"></i>
+                                    How do I register my address in Munich?
+                                </a>
+                            </div>
+                            <div class="mb-2">
+                                <a href="#" class="sample-question text-primary">
+                                    <i data-feather="help-circle" style="width: 16px; height: 16px; margin-right: 4px;"></i>
+                                    What documents do I need for a residence permit?
+                                </a>
+                            </div>
+                            <div>
+                                <a href="#" class="sample-question text-primary">
+                                    <i data-feather="help-circle" style="width: 16px; height: 16px; margin-right: 4px;"></i>
+                                    How can I find an apartment in Munich?
+                                </a>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-2">
+                                <a href="#" class="sample-question text-primary">
+                                    <i data-feather="help-circle" style="width: 16px; height: 16px; margin-right: 4px;"></i>
+                                    What health insurance options do I have?
+                                </a>
+                            </div>
+                            <div class="mb-2">
+                                <a href="#" class="sample-question text-primary">
+                                    <i data-feather="help-circle" style="width: 16px; height: 16px; margin-right: 4px;"></i>
+                                    How do I open a bank account in Germany?
+                                </a>
+                            </div>
+                            <div>
+                                <a href="#" class="sample-question text-primary">
+                                    <i data-feather="help-circle" style="width: 16px; height: 16px; margin-right: 4px;"></i>
+                                    Where can I learn German in Munich?
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chatbot.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Sample question functionality
+        const sampleQuestions = document.querySelectorAll('.sample-question');
+        const chatInput = document.getElementById('chat-input');
+        const chatForm = document.getElementById('chat-form');
+        
+        sampleQuestions.forEach(question => {
+            question.addEventListener('click', function(e) {
+                e.preventDefault();
+                const questionText = this.textContent.trim();
+                chatInput.value = questionText;
+                chatInput.focus();
+                
+                // Submit the form
+                chatForm.dispatchEvent(new Event('submit'));
+            });
+        });
+    });
+</script>
+{% endblock %}

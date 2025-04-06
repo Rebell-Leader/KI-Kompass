@@ -1,0 +1,280 @@
+{% extends 'base.html' %}
+
+{% block title %}KI Kompass - Your Profile{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <h1 class="mb-4">Your Profile</h1>
+            
+            <div class="card shadow-sm mb-4">
+                <div class="card-body p-4">
+                    <div class="d-flex align-items-center mb-4">
+                        <div style="width: 80px; height: 80px; border-radius: 50%; background-color: var(--primary); color: var(--secondary); display: flex; align-items: center; justify-content: center; font-size: 36px; margin-right: 24px;">
+                            {{ user.username[0]|upper }}
+                        </div>
+                        <div>
+                            <h2 class="mb-1">{{ user.full_name or user.username }}</h2>
+                            <p class="mb-0 text-muted">{{ user.email }}</p>
+                        </div>
+                    </div>
+                    
+                    <ul class="nav nav-tabs mb-4" id="profileTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link active" id="personal-tab" data-bs-toggle="tab" href="#personal" role="tab" aria-controls="personal" aria-selected="true">Personal Information</a>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <a class="nav-link" id="security-tab" data-bs-toggle="tab" href="#security" role="tab" aria-controls="security" aria-selected="false">Security</a>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content" id="profileTabsContent">
+                        <!-- Personal Information Tab -->
+                        <div class="tab-pane fade show active" id="personal" role="tabpanel" aria-labelledby="personal-tab">
+                            <form action="{{ url_for('users_bp.update_user', user_id=user.id) }}" method="POST" id="profile-form">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="full_name" class="form-label">Full Name</label>
+                                            <input type="text" id="full_name" name="full_name" class="form-control" value="{{ user.full_name or '' }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="email" class="form-label">Email</label>
+                                            <input type="email" id="email" name="email" class="form-control" value="{{ user.email }}" readonly>
+                                            <small class="form-text text-muted">Email cannot be changed</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="nationality" class="form-label">Nationality</label>
+                                            <select id="nationality" name="nationality" class="form-control">
+                                                <option value="" disabled {% if not user.nationality %}selected{% endif %}>Select your nationality</option>
+                                                <option value="USA" {% if user.nationality == 'USA' %}selected{% endif %}>United States</option>
+                                                <option value="IND" {% if user.nationality == 'IND' %}selected{% endif %}>India</option>
+                                                <option value="CHN" {% if user.nationality == 'CHN' %}selected{% endif %}>China</option>
+                                                <option value="RUS" {% if user.nationality == 'RUS' %}selected{% endif %}>Russia</option>
+                                                <option value="GBR" {% if user.nationality == 'GBR' %}selected{% endif %}>United Kingdom</option>
+                                                <option value="CAN" {% if user.nationality == 'CAN' %}selected{% endif %}>Canada</option>
+                                                <option value="AUS" {% if user.nationality == 'AUS' %}selected{% endif %}>Australia</option>
+                                                <option value="BRA" {% if user.nationality == 'BRA' %}selected{% endif %}>Brazil</option>
+                                                <option value="TUR" {% if user.nationality == 'TUR' %}selected{% endif %}>Turkey</option>
+                                                <option value="Other" {% if user.nationality and user.nationality not in ['USA', 'IND', 'CHN', 'RUS', 'GBR', 'CAN', 'AUS', 'BRA', 'TUR'] %}selected{% endif %}>Other</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="visa_type" class="form-label">Visa Type</label>
+                                            <select id="visa_type" name="visa_type" class="form-control">
+                                                <option value="" disabled {% if not user.visa_type %}selected{% endif %}>Select your visa type</option>
+                                                <option value="work" {% if user.visa_type == 'work' %}selected{% endif %}>Work Visa</option>
+                                                <option value="blue_card" {% if user.visa_type == 'blue_card' %}selected{% endif %}>EU Blue Card</option>
+                                                <option value="study" {% if user.visa_type == 'study' %}selected{% endif %}>Student Visa</option>
+                                                <option value="family_reunion" {% if user.visa_type == 'family_reunion' %}selected{% endif %}>Family Reunion Visa</option>
+                                                <option value="job_seeker" {% if user.visa_type == 'job_seeker' %}selected{% endif %}>Job Seeker Visa</option>
+                                                <option value="eu_citizen" {% if user.visa_type == 'eu_citizen' %}selected{% endif %}>EU Citizen (No Visa Required)</option>
+                                                <option value="other" {% if user.visa_type and user.visa_type not in ['work', 'blue_card', 'study', 'family_reunion', 'job_seeker', 'eu_citizen'] %}selected{% endif %}>Other</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="arrival_date" class="form-label">Arrival Date in Germany</label>
+                                            <input type="date" id="arrival_date" name="arrival_date" class="form-control" value="{{ user.arrival_date.strftime('%Y-%m-%d') if user.arrival_date else '' }}">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="german_level" class="form-label">German Language Level</label>
+                                            <select id="german_level" name="german_level" class="form-control">
+                                                <option value="" disabled {% if not user.german_level %}selected{% endif %}>Select your German level</option>
+                                                <option value="none" {% if user.german_level == 'none' %}selected{% endif %}>No knowledge</option>
+                                                <option value="A1" {% if user.german_level == 'A1' %}selected{% endif %}>A1 - Beginner</option>
+                                                <option value="A2" {% if user.german_level == 'A2' %}selected{% endif %}>A2 - Elementary</option>
+                                                <option value="B1" {% if user.german_level == 'B1' %}selected{% endif %}>B1 - Intermediate</option>
+                                                <option value="B2" {% if user.german_level == 'B2' %}selected{% endif %}>B2 - Upper Intermediate</option>
+                                                <option value="C1" {% if user.german_level == 'C1' %}selected{% endif %}>C1 - Advanced</option>
+                                                <option value="C2" {% if user.german_level == 'C2' %}selected{% endif %}>C2 - Proficient</option>
+                                                <option value="native" {% if user.german_level == 'native' %}selected{% endif %}>Native Speaker</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label for="employment_status" class="form-label">Employment Status</label>
+                                            <select id="employment_status" name="employment_status" class="form-control">
+                                                <option value="" disabled {% if not user.employment_status %}selected{% endif %}>Select your employment status</option>
+                                                <option value="employed" {% if user.employment_status == 'employed' %}selected{% endif %}>Employed</option>
+                                                <option value="self-employed" {% if user.employment_status == 'self-employed' %}selected{% endif %}>Self-employed</option>
+                                                <option value="student" {% if user.employment_status == 'student' %}selected{% endif %}>Student</option>
+                                                <option value="job_seeking" {% if user.employment_status == 'job_seeking' %}selected{% endif %}>Job seeking</option>
+                                                <option value="retired" {% if user.employment_status == 'retired' %}selected{% endif %}>Retired</option>
+                                                <option value="other" {% if user.employment_status and user.employment_status not in ['employed', 'self-employed', 'student', 'job_seeking', 'retired'] %}selected{% endif %}>Other</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group mb-3">
+                                            <label class="form-label">Relocating with Family</label>
+                                            <div class="d-flex">
+                                                <div class="form-check me-3">
+                                                    <input class="form-check-input" type="radio" name="has_family" id="has_family_yes" value="true" {% if user.has_family %}checked{% endif %}>
+                                                    <label class="form-check-label" for="has_family_yes">Yes</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="has_family" id="has_family_no" value="false" {% if not user.has_family %}checked{% endif %}>
+                                                    <label class="form-check-label" for="has_family_no">No</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="family-details" style="{% if not user.has_family %}display: none;{% endif %}">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <div class="form-group mb-3">
+                                                <label for="spouse_nationality" class="form-label">Spouse's Nationality</label>
+                                                <select id="spouse_nationality" name="spouse_nationality" class="form-control">
+                                                    <option value="" {% if not user.spouse_nationality %}selected{% endif %}>Select nationality</option>
+                                                    <option value="USA" {% if user.spouse_nationality == 'USA' %}selected{% endif %}>United States</option>
+                                                    <option value="IND" {% if user.spouse_nationality == 'IND' %}selected{% endif %}>India</option>
+                                                    <option value="CHN" {% if user.spouse_nationality == 'CHN' %}selected{% endif %}>China</option>
+                                                    <option value="RUS" {% if user.spouse_nationality == 'RUS' %}selected{% endif %}>Russia</option>
+                                                    <option value="GBR" {% if user.spouse_nationality == 'GBR' %}selected{% endif %}>United Kingdom</option>
+                                                    <option value="CAN" {% if user.spouse_nationality == 'CAN' %}selected{% endif %}>Canada</option>
+                                                    <option value="AUS" {% if user.spouse_nationality == 'AUS' %}selected{% endif %}>Australia</option>
+                                                    <option value="BRA" {% if user.spouse_nationality == 'BRA' %}selected{% endif %}>Brazil</option>
+                                                    <option value="TUR" {% if user.spouse_nationality == 'TUR' %}selected{% endif %}>Turkey</option>
+                                                    <option value="DEU" {% if user.spouse_nationality == 'DEU' %}selected{% endif %}>Germany</option>
+                                                    <option value="Other" {% if user.spouse_nationality and user.spouse_nationality not in ['USA', 'IND', 'CHN', 'RUS', 'GBR', 'CAN', 'AUS', 'BRA', 'TUR', 'DEU'] %}selected{% endif %}>Other</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="form-group mb-3">
+                                                <label for="num_children" class="form-label">Number of Children</label>
+                                                <select id="num_children" name="num_children" class="form-control">
+                                                    <option value="0" {% if user.num_children == 0 %}selected{% endif %}>0</option>
+                                                    <option value="1" {% if user.num_children == 1 %}selected{% endif %}>1</option>
+                                                    <option value="2" {% if user.num_children == 2 %}selected{% endif %}>2</option>
+                                                    <option value="3" {% if user.num_children == 3 %}selected{% endif %}>3</option>
+                                                    <option value="4" {% if user.num_children == 4 %}selected{% endif %}>4</option>
+                                                    <option value="5" {% if user.num_children >= 5 %}selected{% endif %}>5 or more</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="text-end mt-4">
+                                    <button type="submit" class="btn btn-primary">Update Profile</button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <!-- Security Tab -->
+                        <div class="tab-pane fade" id="security" role="tabpanel" aria-labelledby="security-tab">
+                            <form action="{{ url_for('users_bp.update_user', user_id=user.id) }}" method="POST" id="password-form">
+                                <div class="form-group mb-3">
+                                    <label for="old_password" class="form-label">Current Password</label>
+                                    <input type="password" id="old_password" name="old_password" class="form-control" required>
+                                </div>
+                                
+                                <div class="form-group mb-3">
+                                    <label for="new_password" class="form-label">New Password</label>
+                                    <input type="password" id="new_password" name="new_password" class="form-control" required minlength="8">
+                                    <small class="form-text text-muted">Password must be at least 8 characters long</small>
+                                </div>
+                                
+                                <div class="form-group mb-4">
+                                    <label for="confirm_password" class="form-label">Confirm New Password</label>
+                                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" required minlength="8">
+                                </div>
+                                
+                                <div class="text-end">
+                                    <button type="submit" class="btn btn-primary">Update Password</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h4 class="mb-3">Account Management</h4>
+                    <p class="text-muted">Need help with your account? Contact our support team at <a href="mailto:support@kikompass.com">support@kikompass.com</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Tab functionality for profile/security tabs
+        const personalTab = document.getElementById('personal-tab');
+        const securityTab = document.getElementById('security-tab');
+        const personalPane = document.getElementById('personal');
+        const securityPane = document.getElementById('security');
+        
+        personalTab.addEventListener('click', function(e) {
+            e.preventDefault();
+            personalTab.classList.add('active');
+            securityTab.classList.remove('active');
+            personalPane.classList.add('show', 'active');
+            securityPane.classList.remove('show', 'active');
+        });
+        
+        securityTab.addEventListener('click', function(e) {
+            e.preventDefault();
+            securityTab.classList.add('active');
+            personalTab.classList.remove('active');
+            securityPane.classList.add('show', 'active');
+            personalPane.classList.remove('show', 'active');
+        });
+        
+        // Toggle family details based on radio selection
+        const familyRadios = document.querySelectorAll('input[name="has_family"]');
+        const familyDetails = document.querySelector('.family-details');
+        
+        familyRadios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                if (this.value === 'true') {
+                    familyDetails.style.display = 'block';
+                } else {
+                    familyDetails.style.display = 'none';
+                }
+            });
+        });
+        
+        // Password confirmation validation
+        const passwordForm = document.getElementById('password-form');
+        const newPassword = document.getElementById('new_password');
+        const confirmPassword = document.getElementById('confirm_password');
+        
+        passwordForm.addEventListener('submit', function(e) {
+            if (newPassword.value !== confirmPassword.value) {
+                e.preventDefault();
+                alert("Passwords don't match. Please try again.");
+                confirmPassword.focus();
+            }
+        });
+    });
+</script>
+{% endblock %}
