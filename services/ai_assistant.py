@@ -68,22 +68,26 @@ def get_ai_response(query, user, conversation_id=None):
         if len(prev_messages) > 1:  # Skip if this is the first message
             context_prompt = f"Based on our conversation about {conversation_summary}, "
         
-        # Attempt with robust error handling and shorter timeout
+        # Using direct OpenAI API instead of LangChain to avoid timeouts
         try:
+            # Skip the retrieval chain and just use direct API calls
             ai_response = ""
-            if is_relocation_query:
-                # Use conversational retrieval chain for relocation-specific queries
-                chain = get_conversation_chain()
-                response = chain({"question": context_prompt + query})
-                ai_response = response.get("answer", "I don't have specific information about that aspect of relocation.")
-            else:
-                # Use basic chain for general queries
-                chain = get_basic_chain()
-                response = chain({
-                    "user_profile": str(user_profile), 
-                    "query": context_prompt + query
-                })
-                ai_response = response.get("text", "I'm not sure how to answer that question.")
+            
+            # Use direct OpenAI API call through our helper function
+            from services.direct_llm import get_direct_llm_response
+            
+            # Prepare a simple prompt
+            prompt = f"""You are KI Kompass, an AI assistant helping people relocate to Munich, Germany.
+            Be friendly, helpful, and provide very concise information.
+            Keep your responses under 100 words to avoid timeouts.
+            
+            User profile: {user_profile}
+            
+            User question: {context_prompt + query}
+            
+            Your short, concise response:"""
+            
+            ai_response = get_direct_llm_response(prompt)
             
             # Save the assistant response to the database
             assistant_message = ChatMessage(
