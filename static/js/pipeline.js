@@ -22,6 +22,15 @@ function initPipeline() {
     
     // Initialize task timeline view
     initTimelineView();
+    
+    // Initialize task checkbox functionality
+    initTaskCheckboxes();
+    
+    // Initialize optional tasks functionality
+    initOptionalTasks();
+    
+    // Initialize pipeline regeneration
+    initPipelineRegeneration();
 }
 
 /**
@@ -240,6 +249,399 @@ function initTimelineView() {
         taskList.style.display = 'block';
         timelineView.style.display = 'none';
     });
+}
+
+/**
+ * Initialize task checkbox functionality
+ */
+function initTaskCheckboxes() {
+    const taskCheckboxes = document.querySelectorAll('.task-checkbox');
+    const taskNotes = document.querySelectorAll('.task-notes');
+    
+    taskCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const taskId = this.getAttribute('data-task-id');
+            const completed = this.checked;
+            
+            updateTaskStatus(taskId, completed);
+        });
+    });
+    
+    taskNotes.forEach(noteField => {
+        noteField.addEventListener('blur', function() {
+            const taskId = this.getAttribute('data-task-id');
+            const notes = this.value;
+            const checkbox = document.querySelector(`.task-checkbox[data-task-id="${taskId}"]`);
+            const completed = checkbox ? checkbox.checked : false;
+            
+            updateTaskStatus(taskId, completed, notes);
+        });
+    });
+}
+
+/**
+ * Update task status in backend
+ */
+function updateTaskStatus(taskId, completed, notes = '') {
+    const taskItem = document.querySelector(`.step-item[data-task-id="${taskId}"]`);
+    if (!taskItem) return;
+    
+    fetch('/api/task/update', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            task_id: taskId,
+            completed: completed,
+            notes: notes
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            if (completed) {
+                taskItem.classList.add('completed');
+            } else {
+                taskItem.classList.remove('completed');
+            }
+            
+            // Update progress indicators
+            updateProgressIndicators();
+        } else {
+            console.error('Failed to update task:', data.error);
+            // Revert checkbox state
+            const checkbox = document.querySelector(`.task-checkbox[data-task-id="${taskId}"]`);
+            if (checkbox) {
+                checkbox.checked = !completed;
+            }
+            
+            // Show error message
+            showToast('Error updating task status', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error updating task:', error);
+        showToast('Error updating task status', 'danger');
+    });
+}
+
+/**
+ * Update UI progress indicators
+ */
+function updateProgressIndicators() {
+    const totalTasks = document.querySelectorAll('.task-checkbox').length;
+    const completedTasks = document.querySelectorAll('.task-checkbox:checked').length;
+    
+    if (totalTasks === 0) return;
+    
+    const progressPercentage = Math.round((completedTasks / totalTasks) * 100);
+    
+    // Update progress bar
+    const progressBar = document.querySelector('.progress-bar');
+    if (progressBar) {
+        progressBar.style.width = `${progressPercentage}%`;
+        progressBar.setAttribute('aria-valuenow', progressPercentage);
+    }
+    
+    // Update progress text
+    const progressText = document.querySelector('.progress-text');
+    if (progressText) {
+        progressText.textContent = `${progressPercentage}%`;
+    }
+    
+    // Update stats card
+    const completedStatsValue = document.querySelector('.dashboard-stats .stat-value:nth-child(1)');
+    if (completedStatsValue) {
+        completedStatsValue.textContent = `${progressPercentage}%`;
+    }
+    
+    const completedTasksValue = document.querySelector('.dashboard-stats .stat-value:nth-child(3)');
+    if (completedTasksValue) {
+        completedTasksValue.textContent = completedTasks;
+    }
+    
+    const pendingTasksValue = document.querySelector('.dashboard-stats .stat-value:nth-child(5)');
+    if (pendingTasksValue) {
+        pendingTasksValue.textContent = totalTasks - completedTasks;
+    }
+}
+
+/**
+ * Initialize optional tasks functionality
+ */
+function initOptionalTasks() {
+    const addTasksButton = document.getElementById('add-optional-tasks');
+    if (!addTasksButton) return;
+    
+    // Open modal with available optional tasks
+    addTasksButton.addEventListener('click', function() {
+        const modal = document.getElementById('optionalTasksModal');
+        if (!modal) return;
+        
+        // Show loading state
+        const loadingEl = document.getElementById('optional-tasks-loading');
+        const containerEl = document.getElementById('optional-tasks-container');
+        const noTasksEl = document.getElementById('no-optional-tasks');
+        const errorEl = document.getElementById('optional-tasks-error');
+        
+        if (loadingEl) loadingEl.style.display = 'block';
+        if (containerEl) containerEl.style.display = 'none';
+        if (noTasksEl) noTasksEl.style.display = 'none';
+        if (errorEl) errorEl.style.display = 'none';
+        
+        // Fetch optional tasks
+        fetch('/api/tasks/optional')
+            .then(response => response.json())
+            .then(data => {
+                if (loadingEl) loadingEl.style.display = 'none';
+                
+                if (data.success) {
+                    if (data.tasks && data.tasks.length > 0) {
+                        renderOptionalTasks(data.tasks);
+                        if (containerEl) containerEl.style.display = 'block';
+                    } else {
+                        if (noTasksEl) noTasksEl.style.display = 'block';
+                    }
+                } else {
+                    if (errorEl) {
+                        errorEl.textContent = data.error || 'Failed to load optional tasks';
+                        errorEl.style.display = 'block';
+                    }
+                }
+            })
+            .catch(error => {
+                if (loadingEl) loadingEl.style.display = 'none';
+                if (errorEl) {
+                    errorEl.textContent = 'Error loading optional tasks';
+                    errorEl.style.display = 'block';
+                }
+                console.error('Error fetching optional tasks:', error);
+            });
+        
+        // Show modal
+        $(modal).modal('show');
+    });
+    
+    // Handle adding selected tasks
+    const addSelectedButton = document.getElementById('add-selected-tasks');
+    if (addSelectedButton) {
+        addSelectedButton.addEventListener('click', function() {
+            const selectedTasks = document.querySelectorAll('.optional-task-item input:checked');
+            if (!selectedTasks.length) return;
+            
+            // Disable button while processing
+            addSelectedButton.disabled = true;
+            addSelectedButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Adding...';
+            
+            // Track progress
+            let tasksAdded = 0;
+            let tasksToAdd = selectedTasks.length;
+            
+            // Add each selected task
+            selectedTasks.forEach(checkbox => {
+                const taskId = checkbox.value;
+                
+                fetch('/api/tasks/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ task_id: taskId })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    tasksAdded++;
+                    
+                    // Mark task as added in UI
+                    const taskItem = checkbox.closest('.optional-task-item');
+                    if (taskItem) {
+                        taskItem.classList.add('added');
+                        taskItem.querySelector('input').disabled = true;
+                    }
+                    
+                    // When all tasks are added, close modal and refresh page
+                    if (tasksAdded === tasksToAdd) {
+                        showToast('Tasks added successfully', 'success');
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error adding task:', error);
+                    tasksAdded++;
+                    
+                    if (tasksAdded === tasksToAdd) {
+                        addSelectedButton.disabled = false;
+                        addSelectedButton.textContent = 'Add Selected Tasks';
+                        showToast('Some tasks could not be added', 'warning');
+                    }
+                });
+            });
+        });
+    }
+}
+
+/**
+ * Render optional tasks in the modal
+ */
+function renderOptionalTasks(tasks) {
+    const container = document.getElementById('optional-tasks-container');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    // Create task items
+    tasks.forEach(task => {
+        const taskElement = document.createElement('div');
+        taskElement.classList.add('optional-task-item', 'card', 'mb-3');
+        
+        // Determine priority class
+        let priorityBadge = '<span class="badge badge-warning">Medium Priority</span>';
+        if (task.priority === 1) {
+            priorityBadge = '<span class="badge badge-danger">High Priority</span>';
+        } else if (task.priority === 3) {
+            priorityBadge = '<span class="badge badge-info">Low Priority</span>';
+        }
+        
+        taskElement.innerHTML = `
+            <div class="card-body">
+                <div class="form-check mb-2">
+                    <input type="checkbox" class="form-check-input" id="task-option-${task.id}" value="${task.id}">
+                    <label class="form-check-label" for="task-option-${task.id}">
+                        <strong>${task.title}</strong>
+                    </label>
+                </div>
+                <p class="mb-2">${task.description}</p>
+                <div class="task-meta">
+                    <span class="badge badge-primary">${task.category}</span>
+                    ${priorityBadge}
+                    <span class="badge badge-secondary">${task.estimated_time}</span>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(taskElement);
+        
+        // Add event listener for checkbox
+        const checkbox = taskElement.querySelector('input[type="checkbox"]');
+        checkbox.addEventListener('change', updateSelectedTasksCount);
+    });
+    
+    // Enable/disable add button based on selection
+    updateSelectedTasksCount();
+}
+
+/**
+ * Update the selected tasks count and button state
+ */
+function updateSelectedTasksCount() {
+    const selectedTasks = document.querySelectorAll('.optional-task-item input:checked');
+    const addButton = document.getElementById('add-selected-tasks');
+    
+    if (addButton) {
+        if (selectedTasks.length > 0) {
+            addButton.disabled = false;
+            addButton.textContent = `Add Selected Tasks (${selectedTasks.length})`;
+        } else {
+            addButton.disabled = true;
+            addButton.textContent = 'Add Selected Tasks';
+        }
+    }
+}
+
+/**
+ * Initialize pipeline regeneration
+ */
+function initPipelineRegeneration() {
+    const regenerateButton = document.getElementById('regenerate-pipeline');
+    if (!regenerateButton) return;
+    
+    regenerateButton.addEventListener('click', function() {
+        const modal = document.getElementById('regeneratePipelineModal');
+        if (modal) {
+            $(modal).modal('show');
+        }
+    });
+    
+    const confirmButton = document.getElementById('confirm-regenerate');
+    if (confirmButton) {
+        confirmButton.addEventListener('click', function() {
+            // Show loading state
+            confirmButton.disabled = true;
+            confirmButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Regenerating...';
+            
+            // Call API to regenerate pipeline
+            fetch('/api/pipeline/regenerate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Pipeline regenerated successfully', 'success');
+                    
+                    // Reload page to show new pipeline
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    confirmButton.disabled = false;
+                    confirmButton.textContent = 'Regenerate Pipeline';
+                    showToast(data.error || 'Failed to regenerate pipeline', 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error regenerating pipeline:', error);
+                confirmButton.disabled = false;
+                confirmButton.textContent = 'Regenerate Pipeline';
+                showToast('Error regenerating pipeline', 'danger');
+            });
+        });
+    }
+}
+
+/**
+ * Show a toast message
+ */
+function showToast(message, type = 'info') {
+    const toastContainer = document.querySelector('.toast-container');
+    
+    // Create container if it doesn't exist
+    if (!toastContainer) {
+        const container = document.createElement('div');
+        container.classList.add('toast-container', 'position-fixed', 'bottom-0', 'end-0', 'p-3');
+        document.body.appendChild(container);
+    }
+    
+    // Create toast
+    const toastElement = document.createElement('div');
+    toastElement.classList.add('toast', 'align-items-center', 'text-white', `bg-${type}`);
+    toastElement.setAttribute('role', 'alert');
+    toastElement.setAttribute('aria-live', 'assertive');
+    toastElement.setAttribute('aria-atomic', 'true');
+    
+    toastElement.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">
+                ${message}
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    `;
+    
+    document.querySelector('.toast-container').appendChild(toastElement);
+    
+    // Initialize Bootstrap toast
+    const toast = new bootstrap.Toast(toastElement, {
+        autohide: true,
+        delay: 5000
+    });
+    
+    toast.show();
 }
 
 /**

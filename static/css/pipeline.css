@@ -1,0 +1,262 @@
+/* Optional Tasks Styling */
+.optional-tasks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 15px;
+}
+
+.optional-task-item {
+    transition: all 0.3s ease;
+    border: 1px solid #dee2e6;
+}
+
+.optional-task-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.optional-task-item.added {
+    opacity: 0.6;
+    background-color: #f8f9fa;
+}
+
+.optional-task-item .task-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 10px;
+}
+
+/* Timeline Styling Enhancements */
+.timeline-container {
+    position: relative;
+    min-height: 600px;
+    padding: 20px 0;
+}
+
+.timeline-arrival {
+    position: relative;
+    width: 200px;
+    padding: 10px;
+    background-color: #005AA8;
+    color: white;
+    border-radius: 5px;
+    margin: 0 auto 30px;
+    text-align: center;
+}
+
+.timeline-arrival:after {
+    content: '';
+    position: absolute;
+    width: 2px;
+    background-color: #dee2e6;
+    top: 100%;
+    bottom: -600px;
+    left: 50%;
+    margin-left: -1px;
+}
+
+.timeline-track {
+    position: relative;
+    height: 100%;
+}
+
+.timeline-item {
+    position: absolute;
+    width: 40%;
+    padding: 10px 15px;
+    background-color: white;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.timeline-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.timeline-left {
+    left: 0;
+}
+
+.timeline-right {
+    right: 0;
+}
+
+.timeline-connector {
+    position: absolute;
+    width: 30px;
+    height: 2px;
+    background-color: #dee2e6;
+    top: 50%;
+}
+
+.timeline-left .timeline-connector {
+    right: -30px;
+}
+
+.timeline-right .timeline-connector {
+    left: -30px;
+}
+
+.timeline-point {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background-color: #005AA8;
+    border-radius: 50%;
+    top: 50%;
+    margin-top: -6px;
+    border: 2px solid white;
+}
+
+.timeline-left .timeline-point {
+    right: -36px;
+}
+
+.timeline-right .timeline-point {
+    left: -36px;
+}
+
+.timeline-point.completed {
+    background-color: #28a745;
+}
+
+.timeline-content {
+    padding: 10px;
+}
+
+.timeline-date {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-bottom: 5px;
+}
+
+.timeline-title {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.timeline-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: 0.7rem;
+    border-radius: 12px;
+    background-color: #e9ecef;
+    color: #495057;
+}
+
+.pre-arrival {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.post-arrival {
+    background-color: #FFB81C;
+    color: #4a4a4a;
+}
+
+.priority-high .timeline-title {
+    color: #dc3545;
+}
+
+.priority-medium .timeline-title {
+    color: #fd7e14;
+}
+
+.priority-low .timeline-title {
+    color: #17a2b8;
+}
+
+.timeline-item.completed {
+    border-left: 5px solid #28a745;
+}
+
+/* Task Item Styling */
+.step-item {
+    position: relative;
+    display: flex;
+    margin-bottom: 20px;
+    padding: 15px;
+    border-radius: 8px;
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+.step-item:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.step-item.highlighted {
+    border: 2px solid #005AA8;
+    background-color: #f0f7ff;
+}
+
+.step-item.completed {
+    background-color: #f8f9fa;
+    border-left: 4px solid #28a745;
+}
+
+.step-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    margin-right: 15px;
+    background-color: #005AA8;
+    border-radius: 50%;
+    color: white;
+    font-weight: bold;
+}
+
+.step-icon.completed {
+    background-color: #28a745;
+}
+
+.step-content {
+    flex: 1;
+}
+
+.step-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    padding-bottom: 5px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.step-title.expanded {
+    font-weight: bold;
+}
+
+.step-deadline {
+    font-size: 0.8rem;
+    color: #6c757d;
+    padding: 3px 8px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+}
+
+.step-deadline.urgent {
+    color: #dc3545;
+    background-color: #fff5f5;
+    font-weight: bold;
+}
+
+.step-details {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    padding: 15px;
+    margin-top: 10px;
+}
+
+/* Toast Container */
+.toast-container {
+    z-index: 1050;
+}
