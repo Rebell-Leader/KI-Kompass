@@ -419,9 +419,9 @@ function initOptionalTasks() {
                 console.error('Error fetching optional tasks:', error);
             });
         
-        // Show modal using Bootstrap 5 API
-        const modalInstance = new bootstrap.Modal(modal);
-        modalInstance.show();
+        // Show modal
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
     });
     
     // Handle adding selected tasks
