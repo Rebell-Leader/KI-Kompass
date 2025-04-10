@@ -26,7 +26,7 @@ init_db(app)
 
 # Import models after db initialization
 from models import User, IntegrationPipeline, ActionStep, TaskStatus, ChatMessage
-from services.pipeline_engine import generate_pipeline
+from services.pipeline_engine import generate_pipeline, select_steps_for_user, calculate_progress
 
 # Login decorator
 def login_required(f):
@@ -326,7 +326,143 @@ def update_task():
         
         db.session.commit()
         
+        # Calculate the new progress
+        calculate_progress(pipeline.id)
+        
         return jsonify({"success": True, "message": "Task updated"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/pipeline/regenerate', methods=['POST'])
+@login_required
+def regenerate_pipeline():
+    user_id = session['user_id']
+    
+    try:
+        # Delete existing pipeline if it exists
+        existing_pipeline = IntegrationPipeline.query.filter_by(user_id=user_id).first()
+        if existing_pipeline:
+            # Delete associated task statuses
+            TaskStatus.query.filter_by(pipeline_id=existing_pipeline.id).delete()
+            db.session.delete(existing_pipeline)
+            db.session.commit()
+        
+        # Generate a new pipeline
+        pipeline = generate_pipeline(user_id)
+        
+        return jsonify({
+            "success": True, 
+            "message": "Pipeline regenerated successfully",
+            "pipeline_id": pipeline.id
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/tasks/optional', methods=['GET'])
+@login_required
+def get_optional_tasks():
+    user_id = session['user_id']
+    
+    try:
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+            
+        pipeline = IntegrationPipeline.query.filter_by(user_id=user_id).first()
+        if not pipeline:
+            return jsonify({"error": "Pipeline not found"}), 404
+            
+        # Get IDs of tasks that are already in the pipeline
+        existing_task_ids = [ts.action_step_id for ts in pipeline.task_statuses]
+        
+        # Get all available action steps that match the user's profile
+        all_matching_steps = select_steps_for_user(user)
+        
+        # Filter out steps that are already in the pipeline
+        optional_steps = [step for step in all_matching_steps if step.id not in existing_task_ids]
+        
+        # Return the optional tasks
+        return jsonify({
+            "success": True,
+            "tasks": [{
+                "id": step.id,
+                "title": step.title,
+                "description": step.description,
+                "category": step.category,
+                "priority": step.priority,
+                "timeline_offset": step.timeline_offset,
+                "required_documents": step.required_documents,
+                "estimated_time": step.estimated_time
+            } for step in optional_steps]
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/tasks/add', methods=['POST'])
+@login_required
+def add_task_to_pipeline():
+    user_id = session['user_id']
+    task_id = request.json.get('task_id')
+    
+    if not task_id:
+        return jsonify({"error": "No task ID provided"}), 400
+        
+    try:
+        pipeline = IntegrationPipeline.query.filter_by(user_id=user_id).first()
+        if not pipeline:
+            return jsonify({"error": "Pipeline not found"}), 404
+            
+        # Check if task already exists in pipeline
+        existing_task = TaskStatus.query.filter_by(
+            pipeline_id=pipeline.id,
+            action_step_id=task_id
+        ).first()
+        
+        if existing_task:
+            return jsonify({"error": "Task already exists in pipeline"}), 400
+            
+        # Get the action step
+        action_step = ActionStep.query.get(task_id)
+        if not action_step:
+            return jsonify({"error": "Action step not found"}), 404
+            
+        # Get user for arrival date
+        user = User.query.get(user_id)
+        arrival_date = user.arrival_date or datetime.utcnow()
+        
+        # Calculate deadline
+        deadline = arrival_date + timedelta(days=action_step.timeline_offset) if action_step.timeline_offset else None
+        
+        # Add task to pipeline
+        task_status = TaskStatus(
+            pipeline_id=pipeline.id,
+            action_step_id=task_id,
+            completed=False,
+            deadline=deadline
+        )
+        db.session.add(task_status)
+        db.session.commit()
+        
+        # Recalculate pipeline progress
+        calculate_progress(pipeline.id)
+        
+        return jsonify({
+            "success": True, 
+            "message": "Task added to pipeline",
+            "task": {
+                "id": action_step.id,
+                "title": action_step.title,
+                "description": action_step.description,
+                "category": action_step.category,
+                "priority": action_step.priority,
+                "deadline": deadline.isoformat() if deadline else None,
+                "required_documents": action_step.required_documents
+            }
+        })
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
