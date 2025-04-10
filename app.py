@@ -1,7 +1,7 @@
 import os
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import Flask, request, session, redirect, url_for, flash, render_template, jsonify
@@ -141,7 +141,6 @@ def onboarding():
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    from datetime import datetime
     
     user = User.query.get(session['user_id'])
     
