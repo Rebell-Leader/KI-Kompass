@@ -350,12 +350,49 @@ def regenerate_pipeline():
         # Generate a new pipeline
         pipeline = generate_pipeline(user_id)
         
+        # Check if tasks were created
+        task_count = TaskStatus.query.filter_by(pipeline_id=pipeline.id).count()
+        logger.debug(f"Regenerated pipeline with {task_count} tasks")
+        
+        # If no tasks were created (visa type mapping issue), add all relevant tasks as fallback
+        if task_count == 0:
+            logger.warning("No tasks were created during pipeline regeneration, adding fallback tasks")
+            user = User.query.get(user_id)
+            
+            # Get all action steps
+            all_steps = ActionStep.query.filter(
+                db.or_(
+                    ActionStep.family_required == user.has_family,
+                    ActionStep.family_required == False
+                )
+            ).all()
+            
+            # Create a task status for each action step
+            arrival_date = user.arrival_date or datetime.utcnow()
+            
+            for step in all_steps:
+                # Calculate deadline based on arrival date and timeline offset
+                deadline = arrival_date + timedelta(days=step.timeline_offset) if step.timeline_offset else None
+                
+                # Create task status
+                task_status = TaskStatus(
+                    pipeline_id=pipeline.id,
+                    action_step_id=step.id,
+                    completed=False,
+                    deadline=deadline
+                )
+                db.session.add(task_status)
+            
+            db.session.commit()
+            logger.info(f"Added {len(all_steps)} fallback tasks to pipeline")
+        
         return jsonify({
             "success": True, 
             "message": "Pipeline regenerated successfully",
             "pipeline_id": pipeline.id
         })
     except Exception as e:
+        logger.error(f"Error regenerating pipeline: {str(e)}")
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
