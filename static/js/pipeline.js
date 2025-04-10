@@ -419,8 +419,9 @@ function initOptionalTasks() {
                 console.error('Error fetching optional tasks:', error);
             });
         
-        // Show modal
-        $(modal).modal('show');
+        // Show modal using Bootstrap 5 API
+        const modalInstance = new bootstrap.Modal(modal);
+        modalInstance.show();
     });
     
     // Handle adding selected tasks
@@ -561,7 +562,9 @@ function initPipelineRegeneration() {
     regenerateButton.addEventListener('click', function() {
         const modal = document.getElementById('regeneratePipelineModal');
         if (modal) {
-            $(modal).modal('show');
+            // Show modal using Bootstrap 5 API
+            const modalInstance = new bootstrap.Modal(modal);
+            modalInstance.show();
         }
     });
     
@@ -635,13 +638,28 @@ function showToast(message, type = 'info') {
     
     document.querySelector('.toast-container').appendChild(toastElement);
     
-    // Initialize Bootstrap toast
-    const toast = new bootstrap.Toast(toastElement, {
-        autohide: true,
-        delay: 5000
-    });
-    
-    toast.show();
+    // Check if Bootstrap 5 is available
+    if (typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+        // Initialize Bootstrap 5 toast
+        const toast = new bootstrap.Toast(toastElement, {
+            autohide: true,
+            delay: 5000
+        });
+        toast.show();
+    } else {
+        // Fallback if Bootstrap Toast is not available
+        document.querySelector('.toast-container').appendChild(toastElement);
+        setTimeout(() => {
+            toastElement.classList.add('show');
+        }, 100);
+        
+        setTimeout(() => {
+            toastElement.classList.remove('show');
+            setTimeout(() => {
+                toastElement.remove();
+            }, 500);
+        }, 5000);
+    }
 }
 
 /**
