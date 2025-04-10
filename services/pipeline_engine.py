@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta
 import logging
-from sqlalchemy import text
 from database import db
 from models import User, IntegrationPipeline, ActionStep, TaskStatus
 
@@ -85,40 +84,36 @@ def select_steps_for_user(user):
     general_visa_type = visa_type_mapping.get(user.visa_type)
     logger.debug(f"Mapped visa type: {general_visa_type}")
     
-    # Start with a base query
-    query = ActionStep.query
+    # Get all steps from database
+    all_steps = ActionStep.query.all()
+    logger.debug(f"Found {len(all_steps)} total steps")
     
-    # Filter by visa types if specified
-    if user.visa_type:
-        # Either:
-        # 1. The action step is for 'all' visa types
-        # 2. The action step is specifically for this visa type
-        # 3. The action step is for the general category of this visa type
-        query = query.filter(
-            db.or_(
-                text("visa_types::jsonb ? 'all'"),  # Steps that apply to all visa types
-                text(f"visa_types::jsonb ? :specific_visa").bindparams(specific_visa=user.visa_type)
-            )
-        )
+    # Filter steps based on visa requirements
+    visa_filtered_steps = []
+    
+    for step in all_steps:
+        step_visa_types = step.visa_types or []
         
-        # Add the general visa type filter if we have a mapping
-        if general_visa_type:
-            query = query.union(
-                ActionStep.query.filter(
-                    text(f"visa_types::jsonb ? :general_visa").bindparams(general_visa=general_visa_type)
-                )
-            )
+        # If the visa types list is empty or contains "all", include for everyone
+        if not step_visa_types or "all" in step_visa_types:
+            visa_filtered_steps.append(step)
+            continue
+            
+        # Check if user's specific visa type is in the list
+        if user.visa_type in step_visa_types:
+            visa_filtered_steps.append(step)
+            continue
+            
+        # Check if the general category is in the list
+        if general_visa_type and general_visa_type in step_visa_types:
+            visa_filtered_steps.append(step)
+            continue
     
-    # Log the query for debugging
-    logger.debug(f"SQL Query: {query}")
-    
-    # Get all steps first, then apply additional filters in Python
-    all_steps = query.all()
-    logger.debug(f"Found {len(all_steps)} steps after visa filtering")
+    logger.debug(f"Found {len(visa_filtered_steps)} steps after visa filtering")
     
     # Filter steps by additional criteria
     filtered_steps = []
-    for step in all_steps:
+    for step in visa_filtered_steps:
         # Always include steps with no specific requirements
         if not step.family_required and not step.employment_required:
             filtered_steps.append(step)
