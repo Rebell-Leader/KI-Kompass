@@ -1,7 +1,6 @@
 import jwt
 import os
 import uuid
-import logging
 from functools import wraps
 from urllib.parse import urlencode
 
@@ -17,10 +16,10 @@ from oauthlib.oauth2.rfc6749.errors import InvalidGrantError
 from sqlalchemy.exc import NoResultFound
 from werkzeug.local import LocalProxy
 
-from database import db
+from app import app, db
 from models import OAuth, User
 
-login_manager = LoginManager()
+login_manager = LoginManager(app)
 
 
 @login_manager.user_loader
@@ -28,8 +27,39 @@ def load_user(user_id):
     return User.query.get(user_id)
 
 
-# Using Flask-Dance's default session storage instead of custom UserSessionStorage
-# This avoids OAuth state management conflicts
+class UserSessionStorage(BaseStorage):
+
+    def get(self, blueprint):
+        try:
+            token = db.session.query(OAuth).filter_by(
+                user_id=current_user.get_id(),
+                browser_session_key=g.browser_session_key,
+                provider=blueprint.name,
+            ).one().token
+        except NoResultFound:
+            token = None
+        return token
+
+    def set(self, blueprint, token):
+        db.session.query(OAuth).filter_by(
+            user_id=current_user.get_id(),
+            browser_session_key=g.browser_session_key,
+            provider=blueprint.name,
+        ).delete()
+        new_model = OAuth()
+        new_model.user_id = current_user.get_id()
+        new_model.browser_session_key = g.browser_session_key
+        new_model.provider = blueprint.name
+        new_model.token = token
+        db.session.add(new_model)
+        db.session.commit()
+
+    def delete(self, blueprint):
+        db.session.query(OAuth).filter_by(
+            user_id=current_user.get_id(),
+            browser_session_key=g.browser_session_key,
+            provider=blueprint.name).delete()
+        db.session.commit()
 
 
 def make_replit_blueprint():
@@ -62,11 +92,15 @@ def make_replit_blueprint():
         use_pkce=True,
         code_challenge_method="S256",
         scope=["openid", "profile", "email", "offline_access"],
-        storage=None,  # Use default session storage
+        storage=UserSessionStorage(),
     )
 
     @replit_bp.before_app_request
     def set_applocal_session():
+        if '_browser_session_key' not in session:
+            session['_browser_session_key'] = uuid.uuid4().hex
+        session.modified = True
+        g.browser_session_key = session['_browser_session_key']
         g.flask_dance_replit = replit_bp.session
 
     @replit_bp.route("/logout")
@@ -106,28 +140,14 @@ def save_user(user_claims):
 
 @oauth_authorized.connect
 def logged_in(blueprint, token):
-    if not token:
-        logging.error("OAuth token is None")
-        return redirect(url_for('replit_auth.error'))
-    
-    try:
-        user_claims = jwt.decode(token['id_token'],
-                                 options={"verify_signature": False})
-        logging.info(f"User claims: {user_claims}")
-        user = save_user(user_claims)
-        login_user(user)
-        blueprint.token = token
-        
-        next_url = session.pop("next_url", None)
-        logging.info(f"Next URL after login: {next_url}")
-        
-        if next_url is not None:
-            return redirect(next_url)
-        else:
-            return redirect(url_for('dashboard'))
-    except Exception as e:
-        logging.error(f"Error during OAuth login: {str(e)}")
-        return redirect(url_for('replit_auth.error'))
+    user_claims = jwt.decode(token['id_token'],
+                             options={"verify_signature": False})
+    user = save_user(user_claims)
+    login_user(user)
+    blueprint.token = token
+    next_url = session.pop("next_url", None)
+    if next_url is not None:
+        return redirect(next_url)
 
 
 @oauth_error.connect
@@ -145,7 +165,6 @@ def require_login(f):
 
         expires_in = replit.token.get('expires_in', 0)
         if expires_in < 0:
-            issuer_url = os.environ.get('ISSUER_URL', "https://replit.com/oidc")
             refresh_token_url = issuer_url + "/token"
             try:
                 token = replit.refresh_token(token_url=refresh_token_url,
