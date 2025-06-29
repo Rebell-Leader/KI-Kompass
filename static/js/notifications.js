@@ -57,6 +57,9 @@ class NotificationManager {
 
             if (data.success && data.notifications) {
                 this.processNotifications(data.notifications);
+            } else if (data.message === "Not authenticated") {
+                // User is not logged in, silently skip notification loading
+                return;
             }
         } catch (error) {
             console.error('Error loading notifications:', error);

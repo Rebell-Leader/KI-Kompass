@@ -504,10 +504,18 @@ def add_task_to_pipeline():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/notifications', methods=['GET'])
-@login_required
 def get_notifications():
     """Get notifications for the current user"""
     try:
+        # Check if user is logged in
+        if 'user_id' not in session:
+            return jsonify({
+                "success": True,
+                "notifications": [],
+                "count": 0,
+                "message": "Not authenticated"
+            })
+        
         from services.notification_service import NotificationService
         user_id = session['user_id']
         
@@ -527,10 +535,16 @@ def get_notifications():
         }), 500
 
 @app.route('/api/notifications/<notification_id>/read', methods=['POST'])
-@login_required
 def mark_notification_read(notification_id):
     """Mark a notification as read"""
     try:
+        # Check if user is logged in
+        if 'user_id' not in session:
+            return jsonify({
+                "success": False,
+                "error": "Not authenticated"
+            }), 401
+        
         from services.notification_service import NotificationService
         user_id = session['user_id']
         
