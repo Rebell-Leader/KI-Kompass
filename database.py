@@ -36,3 +36,10 @@ def init_db(app):
         # Populate action steps if they don't exist
         if ActionStep.query.count() == 0:
             populate_action_steps(db)
+        
+        # Create performance indexes
+        try:
+            from services.database_optimization import DatabaseOptimizer
+            DatabaseOptimizer.create_performance_indexes()
+        except Exception as e:
+            print(f"Warning: Could not create performance indexes: {str(e)}")
