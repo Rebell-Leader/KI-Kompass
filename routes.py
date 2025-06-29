@@ -252,3 +252,159 @@ def update_task(task_id):
     except Exception as e:
         logger.error(f"Update task error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+# Additional API endpoints for comprehensive testing
+
+@app.route('/api/users', methods=['POST'])
+def api_create_user():
+    """Create a new user profile"""
+    try:
+        data = request.get_json()
+        
+        # Create user
+        user = User(
+            id=data.get('user_id', f"test_user_{datetime.now().timestamp()}"),
+            full_name=data.get('full_name'),
+            nationality=data.get('nationality'),
+            visa_type=data.get('visa_type'),
+            has_family=data.get('has_family', False),
+            spouse_nationality=data.get('spouse_nationality'),
+            num_children=data.get('num_children', 0),
+            employment_status=data.get('employment_status'),
+            german_level=data.get('german_level'),
+            onboarded=True
+        )
+        
+        # Parse arrival date
+        if data.get('arrival_date'):
+            try:
+                user.arrival_date = datetime.fromisoformat(data['arrival_date'].replace('Z', '+00:00'))
+            except ValueError:
+                return jsonify({"error": "Invalid date format"}), 400
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        return jsonify({
+            "success": True,
+            "user_id": user.id,
+            "message": "User created successfully"
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Error creating user: {str(e)}")
+        return jsonify({"error": "Failed to create user"}), 500
+
+@app.route('/api/pipelines', methods=['POST'])
+def api_create_pipeline():
+    """Create a new integration pipeline for a user"""
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        
+        if not user_id:
+            return jsonify({"error": "user_id is required"}), 400
+        
+        # Check if user exists
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+        
+        # Generate pipeline
+        pipeline = generate_pipeline(user_id)
+        
+        # Get tasks
+        tasks = []
+        for task_status in pipeline.task_statuses:
+            tasks.append({
+                "id": task_status.id,
+                "title": task_status.action_step.title,
+                "description": task_status.action_step.description,
+                "category": task_status.action_step.category,
+                "completed": task_status.completed,
+                "deadline": task_status.deadline.isoformat() if task_status.deadline else None,
+                "priority": task_status.action_step.priority,
+                "estimated_time": task_status.action_step.estimated_time
+            })
+        
+        return jsonify({
+            "success": True,
+            "pipeline_id": pipeline.id,
+            "title": pipeline.title,
+            "progress": pipeline.progress,
+            "tasks": tasks,
+            "created_at": pipeline.created_at.isoformat()
+        }), 201
+        
+    except Exception as e:
+        logger.error(f"Error creating pipeline: {str(e)}")
+        return jsonify({"error": "Failed to create pipeline"}), 500
+
+@app.route('/api/pipelines/<int:pipeline_id>', methods=['GET'])
+def api_get_pipeline(pipeline_id):
+    """Get pipeline details with tasks"""
+    try:
+        pipeline = db.session.get(IntegrationPipeline, pipeline_id)
+        if not pipeline:
+            return jsonify({"error": "Pipeline not found"}), 404
+        
+        # Get tasks
+        tasks = []
+        for task_status in pipeline.task_statuses:
+            tasks.append({
+                "id": task_status.id,
+                "title": task_status.action_step.title,
+                "description": task_status.action_step.description,
+                "category": task_status.action_step.category,
+                "completed": task_status.completed,
+                "deadline": task_status.deadline.isoformat() if task_status.deadline else None,
+                "priority": task_status.action_step.priority,
+                "estimated_time": task_status.action_step.estimated_time
+            })
+        
+        return jsonify({
+            "pipeline_id": pipeline.id,
+            "user_id": pipeline.user_id,
+            "title": pipeline.title,
+            "description": pipeline.description,
+            "progress": pipeline.progress,
+            "tasks": tasks,
+            "created_at": pipeline.created_at.isoformat(),
+            "updated_at": pipeline.updated_at.isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting pipeline: {str(e)}")
+        return jsonify({"error": "Failed to get pipeline"}), 500
+
+@app.route('/api/tasks/upcoming', methods=['GET'])
+def api_get_upcoming_tasks():
+    """Get upcoming tasks across all users"""
+    try:
+        # Get all non-completed tasks ordered by deadline
+        upcoming_tasks = db.session.query(TaskStatus).join(ActionStep).filter(
+            TaskStatus.completed == False,
+            TaskStatus.deadline.isnot(None)
+        ).order_by(TaskStatus.deadline.asc()).limit(50).all()
+        
+        tasks = []
+        for task_status in upcoming_tasks:
+            tasks.append({
+                "id": task_status.id,
+                "title": task_status.action_step.title,
+                "description": task_status.action_step.description,
+                "category": task_status.action_step.category,
+                "deadline": task_status.deadline.isoformat() if task_status.deadline else None,
+                "priority": task_status.action_step.priority,
+                "user_id": task_status.pipeline.user_id,
+                "pipeline_id": task_status.pipeline_id
+            })
+        
+        return jsonify({
+            "tasks": tasks,
+            "count": len(tasks)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting upcoming tasks: {str(e)}")
+        return jsonify({"error": "Failed to get upcoming tasks"}), 500
