@@ -38,23 +38,7 @@ app.register_blueprint(replit_bp, url_prefix="/auth")
 # Import models to ensure they're registered
 import models  # noqa: F401
 
-def init_database():
-    """Initialize database tables and data"""
-    with app.app_context():
-        db.create_all()
-        logging.info("Database tables created")
-        
-        # Populate action steps if they don't exist
-        if models.ActionStep.query.count() == 0:
-            from data.action_steps import populate_action_steps
-            populate_action_steps(db)
-        
-        # Create performance indexes
-        try:
-            from services.database_optimization import DatabaseOptimizer
-            DatabaseOptimizer.create_performance_indexes()
-        except Exception as e:
-            logging.warning(f"Could not create performance indexes: {str(e)}")
+# Database initialization will happen on first request to avoid context issues
 
-# Initialize database
-init_database()
+# Import routes after app and database are initialized
+import routes  # noqa: F401

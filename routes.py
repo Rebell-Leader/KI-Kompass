@@ -11,6 +11,30 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Database initialization flag
+_db_initialized = False
+
+def ensure_database_initialized():
+    """Ensure database is initialized on first request"""
+    global _db_initialized
+    if not _db_initialized:
+        db.create_all()
+        logging.info("Database tables created")
+        
+        # Populate action steps if they don't exist
+        if ActionStep.query.count() == 0:
+            from data.action_steps import populate_action_steps
+            populate_action_steps(db)
+        
+        # Create performance indexes
+        try:
+            from services.database_optimization import DatabaseOptimizer
+            DatabaseOptimizer.create_performance_indexes()
+        except Exception as e:
+            logging.warning(f"Could not create performance indexes: {str(e)}")
+        
+        _db_initialized = True
+
 # Make session permanent
 @app.before_request
 def make_session_permanent():
