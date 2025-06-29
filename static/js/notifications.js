@@ -53,6 +53,10 @@ class NotificationManager {
     async loadNotifications() {
         try {
             const response = await fetch('/api/notifications');
+            if (!response.ok) {
+                // Silently fail if notifications endpoint is not available
+                return;
+            }
             const data = await response.json();
 
             if (data.success && data.notifications) {
@@ -62,7 +66,8 @@ class NotificationManager {
                 return;
             }
         } catch (error) {
-            console.error('Error loading notifications:', error);
+            // Silently fail for demo mode or when notifications are not available
+            return;
         }
     }
 

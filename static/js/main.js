@@ -177,6 +177,8 @@ function initTooltips() {
 function initTaskManagement() {
     const taskCheckboxes = document.querySelectorAll('.task-checkbox');
     
+    if (!taskCheckboxes.length) return; // Exit if no task checkboxes found
+    
     taskCheckboxes.forEach(checkbox => {
         checkbox.addEventListener('change', function() {
             const taskId = this.getAttribute('data-task-id');
@@ -270,7 +272,8 @@ function initTaskManagement() {
         notesField.addEventListener('blur', function() {
             const taskId = this.getAttribute('data-task-id');
             const notes = this.value;
-            const isCompleted = document.querySelector(`.task-checkbox[data-task-id="${taskId}"]`).checked;
+            const checkbox = document.querySelector(`.task-checkbox[data-task-id="${taskId}"]`);
+            const isCompleted = checkbox ? checkbox.checked : false;
             
             // Send task update to server
             fetch('/api/task/update', {
