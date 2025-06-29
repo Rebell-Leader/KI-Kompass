@@ -151,7 +151,7 @@ class NotificationService:
         
         try:
             # Welcome message for new users
-            if user.created_at and (datetime.utcnow() - user.created_at).days < 1:
+            if user.created_at is not None and (datetime.utcnow() - user.created_at).days < 1:
                 notifications.append({
                     'id': f"welcome_{user.id}",
                     'type': 'welcome',
@@ -163,7 +163,7 @@ class NotificationService:
                 })
             
             # Onboarding completion reminder
-            if not user.onboarded:
+            if user.onboarded == False:
                 notifications.append({
                     'id': f"onboarding_{user.id}",
                     'type': 'onboarding',

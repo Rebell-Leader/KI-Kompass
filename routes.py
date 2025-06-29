@@ -51,6 +51,7 @@ def index():
 @require_login
 def dashboard():
     """Main dashboard for logged in users"""
+    ensure_database_initialized()
     user = current_user
     
     # Check if user needs onboarding
@@ -62,23 +63,36 @@ def dashboard():
     
     if not pipeline:
         # Generate pipeline if it doesn't exist
-        generate_pipeline(user.id)
-        pipeline = IntegrationPipeline.query.filter_by(user_id=user.id).first()
+        try:
+            generate_pipeline(user.id)
+            pipeline = IntegrationPipeline.query.filter_by(user_id=user.id).first()
+        except Exception as e:
+            logger.error(f"Error generating pipeline for user {user.id}: {str(e)}")
+            flash("Error creating your personalized pipeline. Please try again.", "error")
+            return redirect(url_for('onboarding'))
     
     # Get tasks with action step details
     tasks = db.session.query(TaskStatus, ActionStep).join(
         ActionStep, TaskStatus.action_step_id == ActionStep.id
     ).filter(TaskStatus.pipeline_id == pipeline.id).all()
     
+    # Separate completed and upcoming tasks
+    completed_tasks = [task for task in tasks if task[0].completed]
+    upcoming_tasks = [task for task in tasks if not task[0].completed]
+    
     return render_template('dashboard.html', 
                          user=user, 
                          pipeline=pipeline, 
-                         tasks=tasks)
+                         tasks=tasks,
+                         completed_tasks=completed_tasks,
+                         upcoming_tasks=upcoming_tasks,
+                         now=datetime.now())
 
 @app.route('/onboarding', methods=['GET', 'POST'])
 @require_login
 def onboarding():
     """Onboarding flow for new users"""
+    ensure_database_initialized()
     user = current_user
     
     if request.method == 'POST':
