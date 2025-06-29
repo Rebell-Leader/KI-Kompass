@@ -1,5 +1,5 @@
 from datetime import datetime
-from database import db
+from app import db
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Float, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from flask_dance.consumer.storage.sqla import OAuthConsumerMixin

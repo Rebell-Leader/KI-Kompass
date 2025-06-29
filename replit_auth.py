@@ -17,7 +17,7 @@ from oauthlib.oauth2.rfc6749.errors import InvalidGrantError
 from sqlalchemy.exc import NoResultFound
 from werkzeug.local import LocalProxy
 
-from app import app, db
+from app import app
 from models import OAuth, User
 
 login_manager = LoginManager(app)
@@ -25,7 +25,8 @@ login_manager = LoginManager(app)
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(user_id)
+    from app import db
+    return db.session.get(User, user_id)
 
 
 # Using Flask-Dance's built-in session storage for OAuth tokens
@@ -92,6 +93,7 @@ def make_replit_blueprint():
 
 
 def save_user(user_claims):
+    from app import db
     user = User()
     user.id = user_claims['sub']
     user.email = user_claims.get('email')
