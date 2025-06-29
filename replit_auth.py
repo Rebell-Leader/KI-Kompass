@@ -140,14 +140,28 @@ def save_user(user_claims):
 
 @oauth_authorized.connect
 def logged_in(blueprint, token):
-    user_claims = jwt.decode(token['id_token'],
-                             options={"verify_signature": False})
-    user = save_user(user_claims)
-    login_user(user)
-    blueprint.token = token
-    next_url = session.pop("next_url", None)
-    if next_url is not None:
-        return redirect(next_url)
+    if not token:
+        logging.error("OAuth token is None")
+        return redirect(url_for('replit_auth.error'))
+    
+    try:
+        user_claims = jwt.decode(token['id_token'],
+                                 options={"verify_signature": False})
+        logging.info(f"User claims: {user_claims}")
+        user = save_user(user_claims)
+        login_user(user)
+        blueprint.token = token
+        
+        next_url = session.pop("next_url", None)
+        logging.info(f"Next URL after login: {next_url}")
+        
+        if next_url is not None:
+            return redirect(next_url)
+        else:
+            return redirect(url_for('dashboard'))
+    except Exception as e:
+        logging.error(f"Error during OAuth login: {str(e)}")
+        return redirect(url_for('replit_auth.error'))
 
 
 @oauth_error.connect
