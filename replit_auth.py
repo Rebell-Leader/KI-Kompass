@@ -11,6 +11,7 @@ from flask_dance.consumer import (
     oauth_error,
 )
 
+
 from flask_login import LoginManager, login_user, logout_user, current_user
 from oauthlib.oauth2.rfc6749.errors import InvalidGrantError
 from sqlalchemy.exc import NoResultFound
@@ -27,7 +28,7 @@ def load_user(user_id):
     return User.query.get(user_id)
 
 
-# Using Flask-Dance's default session storage for OAuth state management
+# Using Flask-Dance's built-in session storage for OAuth tokens
 
 
 def make_replit_blueprint():
