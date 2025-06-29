@@ -413,7 +413,7 @@ def api_get_upcoming_tasks():
 
 @app.route('/demo')
 def demo_mode():
-    """Start demo mode - create temporary demo user"""
+    """Start demo mode - show onboarding directly"""
     try:
         # Create demo user with session ID
         demo_session_id = f"demo_{datetime.now().timestamp()}"
@@ -423,8 +423,8 @@ def demo_mode():
         session['demo_session_id'] = demo_session_id
         session.permanent = True
         
-        # Redirect to demo onboarding
-        return redirect(url_for('demo_onboarding'))
+        # Show onboarding directly instead of redirecting
+        return render_template('demo_onboarding.html', demo_mode=True)
         
     except Exception as e:
         logger.error(f"Error starting demo mode: {str(e)}")
@@ -434,16 +434,24 @@ def demo_mode():
 @app.route('/demo/onboarding')
 def demo_onboarding():
     """Demo onboarding flow - no authentication required"""
+    # Initialize demo session if not present
     if not session.get('demo_mode'):
-        return redirect(url_for('demo_mode'))
+        demo_session_id = f"demo_{datetime.now().timestamp()}"
+        session['demo_mode'] = True
+        session['demo_session_id'] = demo_session_id
+        session.permanent = True
     
     return render_template('demo_onboarding.html', demo_mode=True)
 
-@app.route('/demo/onboarding', methods=['POST'])
+@app.route('/demo/submit', methods=['POST'])
 def demo_onboarding_submit():
     """Process demo onboarding form"""
+    # Initialize demo session if not present
     if not session.get('demo_mode'):
-        return redirect(url_for('demo_mode'))
+        demo_session_id = f"demo_{datetime.now().timestamp()}"
+        session['demo_mode'] = True
+        session['demo_session_id'] = demo_session_id
+        session.permanent = True
     
     try:
         # Get form data
