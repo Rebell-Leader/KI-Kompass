@@ -116,6 +116,10 @@ def logged_in(blueprint, token):
 
 @oauth_error.connect
 def handle_error(blueprint, error, error_description=None, error_uri=None):
+    if 'mismatching_state' in str(error) or 'MismatchingStateError' in str(error):
+        # Clear the session and retry login for state mismatch errors
+        session.clear()
+        return redirect(url_for('replit_auth.login'))
     return redirect(url_for('replit_auth.error'))
 
 

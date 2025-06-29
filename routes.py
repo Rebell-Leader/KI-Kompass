@@ -35,10 +35,14 @@ def ensure_database_initialized():
         
         _db_initialized = True
 
-# Make session permanent
+# Make session permanent and ensure OAuth state persistence
 @app.before_request
 def make_session_permanent():
     session.permanent = True
+    # Ensure session is saved for OAuth state management
+    if not session.get('_csrf_token'):
+        session['_csrf_token'] = True
+        session.modified = True
 
 @app.route('/')
 def index():
