@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 from models import User, TaskStatus, ActionStep
-from database import db
+from app import db
 
 logger = logging.getLogger(__name__)
 

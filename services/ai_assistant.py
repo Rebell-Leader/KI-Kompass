@@ -4,7 +4,7 @@ import time
 import uuid
 from services.llm_engine import get_conversation_chain, get_basic_chain
 from models import ChatMessage
-from database import db
+from app import db
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

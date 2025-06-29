@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 import logging
-from database import db
+from app import db
 from models import User, IntegrationPipeline, ActionStep, TaskStatus
 
 def generate_pipeline(user_id):

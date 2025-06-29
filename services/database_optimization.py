@@ -1,6 +1,6 @@
 import logging
 from sqlalchemy import Index, text
-from database import db
+from app import db
 from models import User, IntegrationPipeline, ActionStep, TaskStatus, ChatMessage
 
 logger = logging.getLogger(__name__)
