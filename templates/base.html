@@ -42,13 +42,14 @@
             
             <nav class="main-nav">
                 <ul>
-                    {% if 'user_id' in session %}
+                    {% if current_user.is_authenticated %}
                         <li><a href="{{ url_for('dashboard') }}" {% if request.path == url_for('dashboard') %}class="active"{% endif %}>Dashboard</a></li>
                         <li><a href="{{ url_for('chat') }}" {% if request.path == url_for('chat') %}class="active"{% endif %}>AI Chat</a></li>
                         <li><a href="{{ url_for('profile') }}" {% if request.path == url_for('profile') %}class="active"{% endif %}>Profile</a></li>
-                        <li><a href="{{ url_for('logout') }}">Logout</a></li>
+                        <li><a href="{{ url_for('replit_auth.logout') }}">Logout</a></li>
                     {% else %}
                         <li><a href="{{ url_for('index') }}" {% if request.path == url_for('index') %}class="active"{% endif %}>Home</a></li>
+                        <li><a href="{{ url_for('replit_auth.login') }}">Login</a></li>
                     {% endif %}
                 </ul>
             </nav>
