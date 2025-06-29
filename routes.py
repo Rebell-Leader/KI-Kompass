@@ -11,6 +11,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# API routes will be added directly to this file
+
 # Database initialization flag
 _db_initialized = False
 

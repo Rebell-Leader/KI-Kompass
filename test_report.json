@@ -1,0 +1,103 @@
+{
+  "summary": {
+    "total_tests": 10,
+    "passed": 5,
+    "failed": 5,
+    "success_rate": "50.0%"
+  },
+  "results": [
+    {
+      "test": "Application Health Check",
+      "success": true,
+      "details": "Status: 200",
+      "timestamp": "2025-06-29T09:17:06.225015"
+    },
+    {
+      "test": "User Creation - Tech Worker - EU",
+      "success": false,
+      "details": "Status: 404, Response: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>\n",
+      "timestamp": "2025-06-29T09:17:06.228915"
+    },
+    {
+      "test": "User Creation - Family with Children - Non-EU",
+      "success": false,
+      "details": "Status: 404, Response: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>\n",
+      "timestamp": "2025-06-29T09:17:06.233039"
+    },
+    {
+      "test": "User Creation - Student - Non-EU",
+      "success": false,
+      "details": "Status: 404, Response: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>\n",
+      "timestamp": "2025-06-29T09:17:06.237095"
+    },
+    {
+      "test": "User Creation - Retiree - EU",
+      "success": false,
+      "details": "Status: 404, Response: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>\n",
+      "timestamp": "2025-06-29T09:17:06.241274"
+    },
+    {
+      "test": "Government Services Retrieval",
+      "success": false,
+      "details": "Status: 404",
+      "timestamp": "2025-06-29T09:17:06.244737"
+    },
+    {
+      "test": "Input Validation - Invalid Profile 1",
+      "success": true,
+      "details": "Status: 404",
+      "timestamp": "2025-06-29T09:17:06.248758"
+    },
+    {
+      "test": "Input Validation - Invalid Profile 2",
+      "success": true,
+      "details": "Status: 404",
+      "timestamp": "2025-06-29T09:17:06.252906"
+    },
+    {
+      "test": "Input Validation - Invalid Profile 3",
+      "success": true,
+      "details": "Status: 404",
+      "timestamp": "2025-06-29T09:17:06.256305"
+    },
+    {
+      "test": "Non-existent Resource Handling",
+      "success": true,
+      "details": "Status: 404",
+      "timestamp": "2025-06-29T09:17:06.259641"
+    }
+  ],
+  "failed_tests": [
+    {
+      "test": "User Creation - Tech Worker - EU",
+      "success": false,
+      "details": "Status: 404, Response: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>\n",
+      "timestamp": "2025-06-29T09:17:06.228915"
+    },
+    {
+      "test": "User Creation - Family with Children - Non-EU",
+      "success": false,
+      "details": "Status: 404, Response: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>\n",
+      "timestamp": "2025-06-29T09:17:06.233039"
+    },
+    {
+      "test": "User Creation - Student - Non-EU",
+      "success": false,
+      "details": "Status: 404, Response: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>\n",
+      "timestamp": "2025-06-29T09:17:06.237095"
+    },
+    {
+      "test": "User Creation - Retiree - EU",
+      "success": false,
+      "details": "Status: 404, Response: <!doctype html>\n<html lang=en>\n<title>404 Not Found</title>\n<h1>Not Found</h1>\n<p>The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.</p>\n",
+      "timestamp": "2025-06-29T09:17:06.241274"
+    },
+    {
+      "test": "Government Services Retrieval",
+      "success": false,
+      "details": "Status: 404",
+      "timestamp": "2025-06-29T09:17:06.244737"
+    }
+  ],
+  "timestamp": "2025-06-29T09:17:06.259667"
+}
