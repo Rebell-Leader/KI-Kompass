@@ -1,13 +1,18 @@
 import os
 import logging
-from langchain_community.llms import OpenAI
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationBufferMemory
-from langchain_community.embeddings import OpenAIEmbeddings
 from langchain_community.vectorstores import Qdrant
-from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
+
+try:
+    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+    LANGCHAIN_OPENAI_AVAILABLE = True
+except ImportError:
+    from langchain_community.llms import OpenAI as ChatOpenAI
+    from langchain_community.embeddings import OpenAIEmbeddings
+    LANGCHAIN_OPENAI_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -43,7 +48,7 @@ def get_embeddings():
     
     # Fallback to OpenAI embeddings
     logger.info("Using OpenAI for embeddings")
-    return OpenAIEmbeddings(api_key=OPENAI_API_KEY)
+    return OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 
 # Initialize language model
 def get_llm():
@@ -54,18 +59,19 @@ def get_llm():
     if FEATHERLESS_API_KEY:
         try:
             logger.info("Using Featherless AI LLM")
-            from langchain_openai import ChatOpenAI
-            
-            # Even more conservative timeouts to prevent worker errors
-            return ChatOpenAI(
-                temperature=0.5,  # Lower temperature for more focused responses
-                model=FEATHERLESS_MODEL,
-                api_key=FEATHERLESS_API_KEY,
-                base_url=FEATHERLESS_BASE_URL,
-                timeout=5.0,  # 5 seconds timeout to prevent worker timeouts
-                max_retries=0,  # Don't retry to avoid worker timeouts
-                streaming=False  # Disable streaming for now to debug the timeout issue
-            )
+            if LANGCHAIN_OPENAI_AVAILABLE:
+                return ChatOpenAI(
+                    temperature=0.5,
+                    model="deepseek-chat",
+                    api_key=FEATHERLESS_API_KEY,
+                    base_url=FEATHERLESS_BASE_URL
+                )
+            else:
+                return ChatOpenAI(
+                    temperature=0.5,
+                    openai_api_key=FEATHERLESS_API_KEY,
+                    openai_api_base=FEATHERLESS_BASE_URL
+                )
         except Exception as e:
             logger.warning(f"Failed to initialize Featherless LLM: {str(e)}")
     
@@ -73,14 +79,17 @@ def get_llm():
     if OPENAI_API_KEY:
         try:
             logger.info("Using OpenAI LLM as fallback")
-            return ChatOpenAI(
-                temperature=0.5,  # Lower temperature for more focused responses
-                model="gpt-3.5-turbo",  # Use 3.5-turbo for cost-effectiveness and speed
-                api_key=OPENAI_API_KEY,
-                timeout=5.0,  # 5 seconds timeout
-                max_retries=0,  # Don't retry to avoid worker timeouts
-                streaming=False  # Disable streaming for now to debug the timeout issue
-            )
+            if LANGCHAIN_OPENAI_AVAILABLE:
+                return ChatOpenAI(
+                    temperature=0.5,
+                    model="gpt-3.5-turbo",
+                    api_key=OPENAI_API_KEY
+                )
+            else:
+                return ChatOpenAI(
+                    temperature=0.5,
+                    openai_api_key=OPENAI_API_KEY
+                )
         except Exception as e:
             logger.warning(f"Failed to initialize OpenAI LLM: {str(e)}")
     
