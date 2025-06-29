@@ -1,6 +1,7 @@
 import jwt
 import os
 import uuid
+import logging
 from functools import wraps
 from urllib.parse import urlencode
 
@@ -27,39 +28,8 @@ def load_user(user_id):
     return User.query.get(user_id)
 
 
-class UserSessionStorage(BaseStorage):
-
-    def get(self, blueprint):
-        try:
-            token = db.session.query(OAuth).filter_by(
-                user_id=current_user.get_id(),
-                browser_session_key=g.browser_session_key,
-                provider=blueprint.name,
-            ).one().token
-        except NoResultFound:
-            token = None
-        return token
-
-    def set(self, blueprint, token):
-        db.session.query(OAuth).filter_by(
-            user_id=current_user.get_id(),
-            browser_session_key=g.browser_session_key,
-            provider=blueprint.name,
-        ).delete()
-        new_model = OAuth()
-        new_model.user_id = current_user.get_id()
-        new_model.browser_session_key = g.browser_session_key
-        new_model.provider = blueprint.name
-        new_model.token = token
-        db.session.add(new_model)
-        db.session.commit()
-
-    def delete(self, blueprint):
-        db.session.query(OAuth).filter_by(
-            user_id=current_user.get_id(),
-            browser_session_key=g.browser_session_key,
-            provider=blueprint.name).delete()
-        db.session.commit()
+# Using Flask-Dance's default session storage instead of custom UserSessionStorage
+# This avoids OAuth state management conflicts
 
 
 def make_replit_blueprint():
@@ -92,15 +62,11 @@ def make_replit_blueprint():
         use_pkce=True,
         code_challenge_method="S256",
         scope=["openid", "profile", "email", "offline_access"],
-        storage=UserSessionStorage(),
+        storage=None,  # Use default session storage
     )
 
     @replit_bp.before_app_request
     def set_applocal_session():
-        if '_browser_session_key' not in session:
-            session['_browser_session_key'] = uuid.uuid4().hex
-        session.modified = True
-        g.browser_session_key = session['_browser_session_key']
         g.flask_dance_replit = replit_bp.session
 
     @replit_bp.route("/logout")
