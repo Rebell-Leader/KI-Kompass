@@ -6,7 +6,7 @@ from models import User, IntegrationPipeline, ActionStep, TaskStatus, ChatMessag
 from services.pipeline_engine import generate_pipeline
 from services.ai_assistant import get_ai_response
 from services.notification_service import NotificationService
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 logger = logging.getLogger(__name__)
@@ -408,3 +408,245 @@ def api_get_upcoming_tasks():
     except Exception as e:
         logger.error(f"Error getting upcoming tasks: {str(e)}")
         return jsonify({"error": "Failed to get upcoming tasks"}), 500
+
+# Demo Mode Routes
+
+@app.route('/demo')
+def demo_mode():
+    """Start demo mode - create temporary demo user"""
+    try:
+        # Create demo user with session ID
+        demo_session_id = f"demo_{datetime.now().timestamp()}"
+        
+        # Store demo session in Flask session
+        session['demo_mode'] = True
+        session['demo_session_id'] = demo_session_id
+        session.permanent = True
+        
+        # Redirect to demo onboarding
+        return redirect(url_for('demo_onboarding'))
+        
+    except Exception as e:
+        logger.error(f"Error starting demo mode: {str(e)}")
+        flash('Error starting demo mode. Please try again.', 'error')
+        return redirect(url_for('index'))
+
+@app.route('/demo/onboarding')
+def demo_onboarding():
+    """Demo onboarding flow - no authentication required"""
+    if not session.get('demo_mode'):
+        return redirect(url_for('demo_mode'))
+    
+    return render_template('demo_onboarding.html', demo_mode=True)
+
+@app.route('/demo/onboarding', methods=['POST'])
+def demo_onboarding_submit():
+    """Process demo onboarding form"""
+    if not session.get('demo_mode'):
+        return redirect(url_for('demo_mode'))
+    
+    try:
+        # Get form data
+        full_name = request.form.get('full_name', 'Demo User')
+        nationality = request.form.get('nationality', 'German')
+        visa_type = request.form.get('visa_type', 'EU_Citizen')
+        arrival_date_str = request.form.get('arrival_date')
+        has_family = request.form.get('has_family') == 'true'
+        spouse_nationality = request.form.get('spouse_nationality', '')
+        num_children = int(request.form.get('num_children', 0))
+        employment_status = request.form.get('employment_status', 'Employed')
+        german_level = request.form.get('german_level', 'A1')
+        
+        # Parse arrival date
+        arrival_date = None
+        if arrival_date_str:
+            try:
+                arrival_date = datetime.strptime(arrival_date_str, '%Y-%m-%d')
+            except ValueError:
+                arrival_date = datetime.now() + timedelta(days=30)
+        else:
+            arrival_date = datetime.now() + timedelta(days=30)
+        
+        # Create demo user
+        demo_user_id = session['demo_session_id']
+        demo_user = User(
+            id=demo_user_id,
+            full_name=full_name,
+            nationality=nationality,
+            visa_type=visa_type,
+            arrival_date=arrival_date,
+            has_family=has_family,
+            spouse_nationality=spouse_nationality if has_family else None,
+            num_children=num_children if has_family else 0,
+            employment_status=employment_status,
+            german_level=german_level,
+            onboarded=True
+        )
+        
+        db.session.add(demo_user)
+        db.session.commit()
+        
+        # Store demo user info in session
+        session['demo_user_id'] = demo_user_id
+        session['demo_user_name'] = full_name
+        
+        # Generate demo pipeline
+        try:
+            pipeline = generate_pipeline(demo_user_id)
+            session['demo_pipeline_id'] = pipeline.id
+            flash(f'Welcome {full_name}! Your personalized relocation pipeline has been created.', 'success')
+        except Exception as e:
+            logger.error(f"Error generating demo pipeline: {str(e)}")
+            flash('Pipeline created successfully!', 'success')
+        
+        return redirect(url_for('demo_dashboard'))
+        
+    except Exception as e:
+        logger.error(f"Error processing demo onboarding: {str(e)}")
+        flash('Error processing onboarding. Please try again.', 'error')
+        return redirect(url_for('demo_onboarding'))
+
+@app.route('/demo/dashboard')
+def demo_dashboard():
+    """Demo dashboard with full functionality"""
+    if not session.get('demo_mode') or not session.get('demo_user_id'):
+        return redirect(url_for('demo_mode'))
+    
+    try:
+        demo_user_id = session['demo_user_id']
+        demo_user = db.session.get(User, demo_user_id)
+        
+        if not demo_user:
+            flash('Demo session expired. Starting new demo.', 'info')
+            return redirect(url_for('demo_mode'))
+        
+        # Get user's pipeline
+        pipeline = IntegrationPipeline.query.filter_by(user_id=demo_user_id).first()
+        
+        upcoming_tasks = []
+        completed_tasks = []
+        
+        if pipeline:
+            for task_status in pipeline.task_statuses:
+                task_data = {
+                    'id': task_status.id,
+                    'title': task_status.action_step.title,
+                    'description': task_status.action_step.description,
+                    'category': task_status.action_step.category,
+                    'priority': task_status.action_step.priority,
+                    'estimated_time': task_status.action_step.estimated_time,
+                    'deadline': task_status.deadline,
+                    'completed': task_status.completed,
+                    'notes': task_status.notes,
+                    'url': task_status.action_step.url,
+                    'address': task_status.action_step.address,
+                    'required_documents': task_status.action_step.required_documents
+                }
+                
+                if task_status.completed:
+                    completed_tasks.append(task_data)
+                else:
+                    upcoming_tasks.append(task_data)
+        
+        # Sort upcoming tasks by priority and deadline
+        upcoming_tasks.sort(key=lambda x: (x['priority'], x['deadline'] or datetime.max))
+        
+        return render_template('demo_dashboard.html',
+                             demo_mode=True,
+                             user=demo_user,
+                             pipeline=pipeline,
+                             upcoming_tasks=upcoming_tasks,
+                             completed_tasks=completed_tasks,
+                             progress=pipeline.progress if pipeline else 0)
+        
+    except Exception as e:
+        logger.error(f"Error in demo dashboard: {str(e)}")
+        flash('Error loading dashboard. Starting new demo.', 'error')
+        return redirect(url_for('demo_mode'))
+
+@app.route('/demo/update_task/<int:task_id>', methods=['POST'])
+def demo_update_task(task_id):
+    """Update task in demo mode"""
+    if not session.get('demo_mode') or not session.get('demo_user_id'):
+        return redirect(url_for('demo_mode'))
+    
+    try:
+        task_status = db.session.get(TaskStatus, task_id)
+        
+        if not task_status or task_status.pipeline.user_id != session['demo_user_id']:
+            flash('Task not found', 'error')
+            return redirect(url_for('demo_dashboard'))
+        
+        # Toggle completion status
+        completed = request.form.get('completed') == 'true'
+        notes = request.form.get('notes', '')
+        
+        task_status.completed = completed
+        task_status.notes = notes
+        if completed:
+            task_status.completion_date = datetime.utcnow()
+        else:
+            task_status.completion_date = None
+        
+        db.session.commit()
+        
+        action = "completed" if completed else "reopened"
+        flash(f'Task "{task_status.action_step.title}" {action} successfully!', 'success')
+        
+        return redirect(url_for('demo_dashboard'))
+        
+    except Exception as e:
+        logger.error(f"Error updating demo task: {str(e)}")
+        flash('Error updating task', 'error')
+        return redirect(url_for('demo_dashboard'))
+
+@app.route('/demo/chat')
+def demo_chat():
+    """Demo chat interface"""
+    if not session.get('demo_mode') or not session.get('demo_user_id'):
+        return redirect(url_for('demo_mode'))
+    
+    demo_user_id = session['demo_user_id']
+    demo_user = db.session.get(User, demo_user_id)
+    
+    return render_template('demo_chat.html', demo_mode=True, user=demo_user)
+
+@app.route('/demo/end')
+def end_demo():
+    """End demo session and cleanup"""
+    if session.get('demo_mode') and session.get('demo_user_id'):
+        try:
+            # Delete demo user and associated data
+            demo_user_id = session['demo_user_id']
+            demo_user = db.session.get(User, demo_user_id)
+            
+            if demo_user:
+                # Delete associated pipeline and tasks
+                pipeline = IntegrationPipeline.query.filter_by(user_id=demo_user_id).first()
+                if pipeline:
+                    # Delete task statuses
+                    TaskStatus.query.filter_by(pipeline_id=pipeline.id).delete()
+                    # Delete pipeline
+                    db.session.delete(pipeline)
+                
+                # Delete chat messages
+                ChatMessage.query.filter_by(user_id=demo_user_id).delete()
+                
+                # Delete user
+                db.session.delete(demo_user)
+                db.session.commit()
+                
+                logger.info(f"Demo session {demo_user_id} cleaned up successfully")
+                
+        except Exception as e:
+            logger.error(f"Error cleaning up demo session: {str(e)}")
+    
+    # Clear demo session
+    session.pop('demo_mode', None)
+    session.pop('demo_session_id', None)
+    session.pop('demo_user_id', None)
+    session.pop('demo_user_name', None)
+    session.pop('demo_pipeline_id', None)
+    
+    flash('Demo session ended. Thank you for trying KI Kompass!', 'info')
+    return redirect(url_for('index'))

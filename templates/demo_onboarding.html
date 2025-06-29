@@ -1,0 +1,194 @@
+{% extends 'base.html' %}
+
+{% block title %}Demo Onboarding - KI Kompass{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center py-5">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0 text-center">
+                        <i data-feather="play-circle" class="me-2"></i>
+                        Demo Mode - Personal Profile
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+                    <div class="alert alert-info">
+                        <i data-feather="info" class="me-2"></i>
+                        <strong>Demo Experience:</strong> Complete this profile to see how KI Kompass creates your personalized Munich relocation pipeline. All data will be automatically deleted when you end the demo.
+                    </div>
+
+                    <form method="POST" action="{{ url_for('demo_onboarding_submit') }}">
+                        <!-- Personal Information -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">Personal Information</h5>
+                            
+                            <div class="mb-3">
+                                <label for="full_name" class="form-label">Full Name</label>
+                                <input type="text" class="form-control" id="full_name" name="full_name" 
+                                       value="Anna Schmidt" required>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="nationality" class="form-label">Nationality</label>
+                                    <select class="form-select" id="nationality" name="nationality" required>
+                                        <option value="German" selected>German</option>
+                                        <option value="American">American</option>
+                                        <option value="British">British</option>
+                                        <option value="French">French</option>
+                                        <option value="Italian">Italian</option>
+                                        <option value="Spanish">Spanish</option>
+                                        <option value="Indian">Indian</option>
+                                        <option value="Chinese">Chinese</option>
+                                        <option value="Brazilian">Brazilian</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="visa_type" class="form-label">Visa/Status Type</label>
+                                    <select class="form-select" id="visa_type" name="visa_type" required>
+                                        <option value="EU_Citizen" selected>EU Citizen</option>
+                                        <option value="Work_Visa">Work Visa</option>
+                                        <option value="Blue_Card">EU Blue Card</option>
+                                        <option value="Student_Visa">Student Visa</option>
+                                        <option value="Family_Reunion">Family Reunion</option>
+                                        <option value="Freelancer">Freelancer Visa</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="arrival_date" class="form-label">Expected Arrival Date</label>
+                                <input type="date" class="form-control" id="arrival_date" name="arrival_date"
+                                       value="{{ (now + timedelta(days=30)).strftime('%Y-%m-%d') if now else '' }}">
+                                <div class="form-text">When do you plan to arrive in Munich?</div>
+                            </div>
+                        </div>
+
+                        <!-- Family Information -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">Family Status</h5>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="has_family" 
+                                           id="has_family_no" value="false" checked>
+                                    <label class="form-check-label" for="has_family_no">
+                                        Moving alone
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="has_family" 
+                                           id="has_family_yes" value="true">
+                                    <label class="form-check-label" for="has_family_yes">
+                                        Moving with family
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div id="family_details" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="spouse_nationality" class="form-label">Spouse Nationality</label>
+                                        <select class="form-select" id="spouse_nationality" name="spouse_nationality">
+                                            <option value="">Select nationality</option>
+                                            <option value="German">German</option>
+                                            <option value="American">American</option>
+                                            <option value="British">British</option>
+                                            <option value="French">French</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-md-6 mb-3">
+                                        <label for="num_children" class="form-label">Number of Children</label>
+                                        <select class="form-select" id="num_children" name="num_children">
+                                            <option value="0" selected>0</option>
+                                            <option value="1">1</option>
+                                            <option value="2">2</option>
+                                            <option value="3">3</option>
+                                            <option value="4+">4+</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Professional Information -->
+                        <div class="mb-4">
+                            <h5 class="text-primary mb-3">Professional Status</h5>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="employment_status" class="form-label">Employment Status</label>
+                                    <select class="form-select" id="employment_status" name="employment_status" required>
+                                        <option value="Tech_Professional" selected>Tech Professional</option>
+                                        <option value="Employed">Employed</option>
+                                        <option value="Self_Employed">Self-Employed</option>
+                                        <option value="Student">Student</option>
+                                        <option value="Researcher">Researcher</option>
+                                        <option value="Retired">Retired</option>
+                                        <option value="Job_Seeking">Job Seeking</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="col-md-6 mb-3">
+                                    <label for="german_level" class="form-label">German Language Level</label>
+                                    <select class="form-select" id="german_level" name="german_level" required>
+                                        <option value="None">None</option>
+                                        <option value="A1">A1 - Beginner</option>
+                                        <option value="A2">A2 - Elementary</option>
+                                        <option value="B1">B1 - Intermediate</option>
+                                        <option value="B2" selected>B2 - Upper Intermediate</option>
+                                        <option value="C1">C1 - Advanced</option>
+                                        <option value="C2">C2 - Proficient</option>
+                                        <option value="Native">Native Speaker</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i data-feather="arrow-right" class="me-2"></i>
+                                Create My Demo Pipeline
+                            </button>
+                            <a href="{{ url_for('index') }}" class="btn btn-outline-secondary">
+                                <i data-feather="x" class="me-2"></i>
+                                Exit Demo
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Show/hide family details based on selection
+    const familyRadios = document.querySelectorAll('input[name="has_family"]');
+    const familyDetails = document.getElementById('family_details');
+    
+    familyRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.value === 'true') {
+                familyDetails.style.display = 'block';
+            } else {
+                familyDetails.style.display = 'none';
+            }
+        });
+    });
+
+    // Set arrival date to 30 days from now if not set
+    const arrivalDateInput = document.getElementById('arrival_date');
+    if (!arrivalDateInput.value) {
+        const futureDate = new Date();
+        futureDate.setDate(futureDate.getDate() + 30);
+        arrivalDateInput.value = futureDate.toISOString().split('T')[0];
+    }
+</script>
+{% endblock %}

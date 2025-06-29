@@ -1,0 +1,367 @@
+{% extends 'base.html' %}
+
+{% block title %}Demo Dashboard - KI Kompass{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Demo Header -->
+        <div class="col-12 mb-4">
+            <div class="alert alert-success d-flex justify-content-between align-items-center">
+                <div>
+                    <i data-feather="play-circle" class="me-2"></i>
+                    <strong>Demo Mode Active</strong> - Welcome {{ user.full_name }}! This is your personalized Munich integration pipeline.
+                </div>
+                <div>
+                    <a href="{{ url_for('demo_chat') }}" class="btn btn-sm btn-outline-success me-2">
+                        <i data-feather="message-circle" class="me-1"></i>
+                        Try AI Chat
+                    </a>
+                    <a href="{{ url_for('end_demo') }}" class="btn btn-sm btn-outline-danger">
+                        <i data-feather="x" class="me-1"></i>
+                        End Demo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Profile Summary -->
+        <div class="col-12 col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i data-feather="user" class="me-2"></i>
+                        Your Profile
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="profile-info">
+                        <div class="mb-3">
+                            <strong>Name:</strong> {{ user.full_name }}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Nationality:</strong> {{ user.nationality }}
+                        </div>
+                        <div class="mb-3">
+                            <strong>Status:</strong> {{ user.visa_type.replace('_', ' ') }}
+                        </div>
+                        {% if user.arrival_date %}
+                        <div class="mb-3">
+                            <strong>Arrival:</strong> {{ user.arrival_date.strftime('%B %d, %Y') }}
+                        </div>
+                        {% endif %}
+                        <div class="mb-3">
+                            <strong>Employment:</strong> {{ user.employment_status.replace('_', ' ') }}
+                        </div>
+                        <div class="mb-3">
+                            <strong>German Level:</strong> {{ user.german_level }}
+                        </div>
+                        {% if user.has_family %}
+                        <div class="mb-3">
+                            <strong>Family:</strong> Yes
+                            {% if user.num_children > 0 %}
+                            ({{ user.num_children }} children)
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Overview -->
+        <div class="col-12 col-lg-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i data-feather="trending-up" class="me-2"></i>
+                        Integration Progress
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center mb-4">
+                        <div class="col-4">
+                            <div class="stat-box">
+                                <h3 class="text-primary">{{ upcoming_tasks|length }}</h3>
+                                <p class="text-muted mb-0">Upcoming Tasks</p>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-box">
+                                <h3 class="text-success">{{ completed_tasks|length }}</h3>
+                                <p class="text-muted mb-0">Completed</p>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="stat-box">
+                                <h3 class="text-info">{{ progress }}%</h3>
+                                <p class="text-muted mb-0">Overall Progress</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="progress mb-3" style="height: 10px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {{ progress }}%" aria-valuenow="{{ progress }}" 
+                             aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="feature-highlight">
+                                <i data-feather="check-circle" class="text-success me-2"></i>
+                                <span>Personalized task selection based on your profile</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="feature-highlight">
+                                <i data-feather="calendar" class="text-primary me-2"></i>
+                                <span>Smart deadline management</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="feature-highlight">
+                                <i data-feather="map-pin" class="text-warning me-2"></i>
+                                <span>Munich-specific guidance and locations</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="feature-highlight">
+                                <i data-feather="message-circle" class="text-info me-2"></i>
+                                <span>AI assistant for questions</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Upcoming Tasks -->
+        <div class="col-12 col-xl-8 mb-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i data-feather="list" class="me-2"></i>
+                        Your Munich Integration Tasks
+                    </h5>
+                    <span class="badge bg-primary">{{ upcoming_tasks|length }} remaining</span>
+                </div>
+                <div class="card-body">
+                    {% if upcoming_tasks %}
+                        <div class="task-list">
+                            {% for task in upcoming_tasks[:8] %}
+                            <div class="task-item border rounded p-3 mb-3">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-2">
+                                            <span class="priority-badge priority-{{ task.priority }}">
+                                                {% if task.priority == 1 %}High{% elif task.priority == 2 %}Medium{% else %}Low{% endif %}
+                                            </span>
+                                            {{ task.title }}
+                                        </h6>
+                                        <p class="text-muted mb-2">{{ task.description }}</p>
+                                        
+                                        <div class="task-meta">
+                                            <span class="badge bg-light text-dark me-2">
+                                                <i data-feather="folder" width="12" height="12" class="me-1"></i>
+                                                {{ task.category.replace('_', ' ') }}
+                                            </span>
+                                            {% if task.estimated_time %}
+                                            <span class="badge bg-light text-dark me-2">
+                                                <i data-feather="clock" width="12" height="12" class="me-1"></i>
+                                                {{ task.estimated_time }}
+                                            </span>
+                                            {% endif %}
+                                            {% if task.deadline %}
+                                            <span class="badge bg-light text-dark">
+                                                <i data-feather="calendar" width="12" height="12" class="me-1"></i>
+                                                {{ task.deadline.strftime('%b %d') }}
+                                            </span>
+                                            {% endif %}
+                                        </div>
+
+                                        {% if task.url or task.address %}
+                                        <div class="task-links mt-2">
+                                            {% if task.url %}
+                                            <a href="{{ task.url }}" target="_blank" class="btn btn-sm btn-outline-primary me-2">
+                                                <i data-feather="external-link" width="12" height="12" class="me-1"></i>
+                                                Visit Website
+                                            </a>
+                                            {% endif %}
+                                            {% if task.address %}
+                                            <a href="https://maps.google.com/?q={{ task.address }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                                <i data-feather="map-pin" width="12" height="12" class="me-1"></i>
+                                                View Location
+                                            </a>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+
+                                        {% if task.required_documents %}
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <strong>Required documents:</strong> 
+                                                {% for doc in task.required_documents %}
+                                                    {{ doc }}{% if not loop.last %}, {% endif %}
+                                                {% endfor %}
+                                            </small>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="task-actions ms-3">
+                                        <form method="POST" action="{{ url_for('demo_update_task', task_id=task.id) }}" class="d-inline">
+                                            <input type="hidden" name="completed" value="true">
+                                            <button type="submit" class="btn btn-success btn-sm" title="Mark as completed">
+                                                <i data-feather="check" width="16" height="16"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        
+                        {% if upcoming_tasks|length > 8 %}
+                        <div class="text-center">
+                            <small class="text-muted">... and {{ upcoming_tasks|length - 8 }} more tasks</small>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i data-feather="check-circle" width="48" height="48" class="text-success mb-3"></i>
+                            <h5>Congratulations!</h5>
+                            <p class="text-muted">You've completed all your integration tasks.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Completed Tasks & Quick Actions -->
+        <div class="col-12 col-xl-4 mb-4">
+            <!-- Quick Actions -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i data-feather="zap" class="me-2"></i>
+                        Quick Actions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('demo_chat') }}" class="btn btn-primary">
+                            <i data-feather="message-circle" class="me-2"></i>
+                            Ask AI Assistant
+                        </a>
+                        <button class="btn btn-outline-secondary" onclick="window.print()">
+                            <i data-feather="printer" class="me-2"></i>
+                            Print Task List
+                        </button>
+                        <a href="https://maps.google.com/?q=Munich+city+center" target="_blank" class="btn btn-outline-info">
+                            <i data-feather="map" class="me-2"></i>
+                            Explore Munich
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Completed Tasks -->
+            {% if completed_tasks %}
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i data-feather="check-circle" class="me-2"></i>
+                        Recent Completions
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="completed-tasks">
+                        {% for task in completed_tasks[:5] %}
+                        <div class="completed-task-item d-flex align-items-center mb-3">
+                            <i data-feather="check-circle" class="text-success me-2" width="16" height="16"></i>
+                            <div class="flex-grow-1">
+                                <div class="fw-medium">{{ task.title }}</div>
+                                <small class="text-muted">{{ task.category.replace('_', ' ') }}</small>
+                            </div>
+                            <form method="POST" action="{{ url_for('demo_update_task', task_id=task.id) }}" class="d-inline">
+                                <input type="hidden" name="completed" value="false">
+                                <button type="submit" class="btn btn-link btn-sm p-0 text-muted" title="Mark as incomplete">
+                                    <i data-feather="rotate-ccw" width="14" height="14"></i>
+                                </button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.stat-box {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background-color: #f8f9fa;
+}
+
+.feature-highlight {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0;
+}
+
+.task-item {
+    background-color: #fafafa;
+    transition: all 0.2s ease;
+}
+
+.task-item:hover {
+    background-color: #f0f0f0;
+    transform: translateY(-1px);
+}
+
+.priority-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 1rem;
+    font-weight: 600;
+}
+
+.priority-1 {
+    background-color: #dc3545;
+    color: white;
+}
+
+.priority-2 {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.priority-3 {
+    background-color: #28a745;
+    color: white;
+}
+
+.completed-task-item {
+    opacity: 0.8;
+}
+
+.task-meta .badge {
+    font-size: 0.7rem;
+}
+
+@media print {
+    .card-header, .btn, .alert {
+        -webkit-print-color-adjust: exact;
+        color-adjust: exact;
+    }
+}
+</style>
+{% endblock %}

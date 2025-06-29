@@ -1,0 +1,490 @@
+{% extends 'base.html' %}
+
+{% block title %}Demo AI Chat - KI Kompass{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Demo Header -->
+        <div class="col-12 mb-4">
+            <div class="alert alert-success d-flex justify-content-between align-items-center">
+                <div>
+                    <i data-feather="message-circle" class="me-2"></i>
+                    <strong>Demo AI Chat</strong> - Ask questions about your Munich relocation journey
+                </div>
+                <div>
+                    <a href="{{ url_for('demo_dashboard') }}" class="btn btn-sm btn-outline-success me-2">
+                        <i data-feather="arrow-left" class="me-1"></i>
+                        Back to Dashboard
+                    </a>
+                    <a href="{{ url_for('end_demo') }}" class="btn btn-sm btn-outline-danger">
+                        <i data-feather="x" class="me-1"></i>
+                        End Demo
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i data-feather="cpu" class="me-2"></i>
+                        KI Kompass AI Assistant
+                    </h5>
+                </div>
+                
+                <div class="card-body p-0">
+                    <!-- Chat Messages Container -->
+                    <div id="chat-messages" class="chat-messages p-4" style="height: 500px; overflow-y: auto;">
+                        <!-- Welcome Message -->
+                        <div class="message assistant-message mb-3">
+                            <div class="message-avatar">
+                                <i data-feather="cpu" class="text-primary"></i>
+                            </div>
+                            <div class="message-content">
+                                <div class="message-text">
+                                    <strong>Welcome to KI Kompass AI Assistant!</strong><br><br>
+                                    I'm here to help with your Munich relocation journey. I have access to your profile and can provide personalized guidance about:
+                                    <ul class="mt-2 mb-0">
+                                        <li>German bureaucracy and registration processes</li>
+                                        <li>Housing search and rental requirements</li>
+                                        <li>Banking and financial services</li>
+                                        <li>Healthcare and insurance</li>
+                                        <li>Job search and work permits</li>
+                                        <li>Language learning resources</li>
+                                        <li>Local culture and integration tips</li>
+                                    </ul>
+                                    <br>
+                                    What would you like to know about moving to Munich?
+                                </div>
+                                <div class="message-time">
+                                    <small class="text-muted">AI Assistant • Just now</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Input -->
+                    <div class="chat-input border-top p-3">
+                        <div class="alert alert-info mb-3">
+                            <i data-feather="info" class="me-2"></i>
+                            <strong>Demo Mode:</strong> This is a preview of our AI chat functionality. In the full version, you would get personalized responses based on your profile and real-time Munich information.
+                        </div>
+                        
+                        <form id="chat-form" class="d-flex gap-2">
+                            <input type="text" id="message-input" class="form-control" 
+                                   placeholder="Ask me anything about relocating to Munich..." 
+                                   autocomplete="off">
+                            <button type="submit" class="btn btn-primary">
+                                <i data-feather="send" width="18" height="18"></i>
+                            </button>
+                        </form>
+                        
+                        <!-- Quick Suggestions -->
+                        <div class="mt-3">
+                            <small class="text-muted">Try asking:</small>
+                            <div class="quick-suggestions mt-2">
+                                <button class="btn btn-outline-secondary btn-sm me-2 mb-2 suggestion-btn">
+                                    How can I find an apartment in Munich?
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm me-2 mb-2 suggestion-btn">
+                                    What documents do I need for Anmeldung?
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm me-2 mb-2 suggestion-btn">
+                                    How do I open a German bank account?
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm me-2 mb-2 suggestion-btn">
+                                    Tell me about health insurance in Germany
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.chat-messages {
+    background-color: #f8f9fa;
+}
+
+.message {
+    display: flex;
+    margin-bottom: 1rem;
+    align-items: flex-start;
+}
+
+.message-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.assistant-message .message-avatar {
+    background-color: #e3f2fd;
+}
+
+.user-message .message-avatar {
+    background-color: #e8f5e8;
+    order: 2;
+    margin-right: 0;
+    margin-left: 12px;
+}
+
+.user-message {
+    flex-direction: row-reverse;
+}
+
+.message-content {
+    flex: 1;
+    max-width: 80%;
+}
+
+.user-message .message-content {
+    text-align: right;
+}
+
+.message-text {
+    background-color: white;
+    padding: 12px 16px;
+    border-radius: 18px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    word-wrap: break-word;
+}
+
+.user-message .message-text {
+    background-color: #007bff;
+    color: white;
+}
+
+.message-time {
+    margin-top: 4px;
+    padding-left: 16px;
+}
+
+.user-message .message-time {
+    text-align: right;
+    padding-left: 0;
+    padding-right: 16px;
+}
+
+.chat-input {
+    background-color: white;
+}
+
+.suggestion-btn:hover {
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.typing-indicator {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background-color: white;
+    border-radius: 18px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.typing-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.typing-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #999;
+    animation: typing 1.4s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes typing {
+    0%, 80%, 100% { 
+        transform: scale(0);
+        opacity: 0.5;
+    }
+    40% { 
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chatForm = document.getElementById('chat-form');
+    const messageInput = document.getElementById('message-input');
+    const chatMessages = document.getElementById('chat-messages');
+    const suggestionBtns = document.querySelectorAll('.suggestion-btn');
+
+    // Demo responses for different questions
+    const demoResponses = {
+        'apartment': {
+            keywords: ['apartment', 'housing', 'rent', 'flat', 'wohnung'],
+            response: `Great question! Finding an apartment in Munich can be challenging, but here are some key strategies:
+
+**Popular Platforms:**
+• ImmobilienScout24.de (most popular)
+• WG-Gesucht.de (for shared apartments)
+• eBay Kleinanzeigen
+• Immowelt.de
+
+**Important Tips:**
+• Prepare your documents in advance (Schufa, income proof, ID)
+• Be ready to view apartments quickly - good ones go fast!
+• Consider neighborhoods like Schwabing, Maxvorstadt, or Sendling
+• Budget around 30-40% of your income for rent
+
+**Your Profile Advantage:**
+As a ${getUserProfile()}, you have stable income which landlords prefer. I can help you prepare the required documents for your applications.
+
+Would you like specific advice about any neighborhood or document preparation?`
+        },
+        'anmeldung': {
+            keywords: ['anmeldung', 'registration', 'documents', 'register'],
+            response: `Anmeldung (address registration) is crucial - you must do this within 14 days of moving to Munich!
+
+**Required Documents:**
+• Valid passport or ID
+• Rental contract or Wohnungsgeberbestätigung (landlord confirmation)
+• Anmeldung form (filled out in advance)
+
+**Where to Go:**
+• Munich Bürgerbüro (Citizen's Office)
+• Book appointment online at muenchen.de
+• Locations: Marienplatz, Pasing, or other districts
+
+**Your Timeline:**
+Based on your arrival date, you should book your appointment now. The earliest slots fill up quickly!
+
+**Pro Tip:**
+Bring a German-speaking friend if your German level is A1-A2, or print a translation of key phrases.
+
+After Anmeldung, you'll get your Meldebescheinigung (registration certificate) - keep this safe, you'll need it for everything else!
+
+Need help with any specific part of this process?`
+        },
+        'bank': {
+            keywords: ['bank', 'account', 'banking', 'konto'],
+            response: `Opening a German bank account is essential for your daily life in Munich. Here's how:
+
+**Popular Banks:**
+• Deutsche Bank (international-friendly)
+• Commerzbank (good for expats)
+• Sparkasse (local, many branches)
+• N26 or DKB (online banks, easier setup)
+
+**Required Documents:**
+• Passport/ID
+• Meldebescheinigung (from Anmeldung)
+• Proof of income or employment contract
+• Sometimes initial deposit (€25-100)
+
+**Your Advantage:**
+As a ${getUserProfile()}, you likely qualify for premium accounts with better conditions. Many banks offer English-speaking service for international clients.
+
+**Process:**
+1. Book appointment online
+2. Bring all documents
+3. Account usually active within 1-2 days
+4. Card arrives by mail in 5-7 days
+
+**Recommendation:**
+Start with N26 for immediate access, then open a traditional account with Deutsche Bank or Commerzbank for better service and acceptance.
+
+Would you like help preparing for your bank appointment?`
+        },
+        'insurance': {
+            keywords: ['insurance', 'health', 'krankenversicherung', 'medical'],
+            response: `Health insurance is mandatory in Germany and must be arranged quickly!
+
+**Types of Insurance:**
+• **Gesetzliche (Public):** AOK, TK, Barmer - covers basics, ~14.6% of salary
+• **Private:** More expensive but better coverage - for high earners
+
+**For Your Situation:**
+As a ${getUserProfile()}, you'll likely use public insurance initially. It's simpler and covers all essential healthcare.
+
+**Popular Public Insurers:**
+• TK (Techniker Krankenkasse) - very popular with expats
+• AOK Bayern - local option
+• Barmer - good online services
+
+**Timeline:**
+• Must have coverage from day 1 of work
+• Apply within 2 weeks of arrival
+• Can be done online or at local offices
+
+**What's Covered:**
+• Doctor visits
+• Hospital stays
+• Prescription medications (small co-pay)
+• Basic dental care
+
+**Next Steps:**
+1. Choose an insurer (TK recommended for expats)
+2. Apply online or visit local office
+3. Provide employment contract
+4. Get insurance card
+
+Need help choosing the best option for your specific situation?`
+        },
+        'default': {
+            keywords: [],
+            response: `I'd be happy to help with your Munich relocation question! 
+
+As your AI assistant, I can provide guidance on:
+• Housing and apartment search
+• German bureaucracy (Anmeldung, etc.)
+• Banking and financial services
+• Health insurance and healthcare
+• Job search and work permits
+• Language learning resources
+• Transportation and getting around Munich
+• Cultural integration tips
+
+Based on your profile as a ${getUserProfile()}, I can give you personalized advice for your specific situation.
+
+Could you be more specific about what aspect of moving to Munich you'd like help with?`
+        }
+    };
+
+    function getUserProfile() {
+        return "{{ user.employment_status.replace('_', ' ') if user else 'professional' }}";
+    }
+
+    function addMessage(text, isUser = false) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${isUser ? 'user-message' : 'assistant-message'} mb-3`;
+        
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        avatarDiv.innerHTML = isUser ? 
+            '<i data-feather="user" class="text-success"></i>' : 
+            '<i data-feather="cpu" class="text-primary"></i>';
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        const textDiv = document.createElement('div');
+        textDiv.className = 'message-text';
+        textDiv.innerHTML = text.replace(/\n/g, '<br>');
+        
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'message-time';
+        timeDiv.innerHTML = `<small class="text-muted">${isUser ? 'You' : 'AI Assistant'} • Just now</small>`;
+        
+        contentDiv.appendChild(textDiv);
+        contentDiv.appendChild(timeDiv);
+        messageDiv.appendChild(avatarDiv);
+        messageDiv.appendChild(contentDiv);
+        
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        // Re-initialize Feather icons
+        feather.replace();
+    }
+
+    function showTypingIndicator() {
+        const typingDiv = document.createElement('div');
+        typingDiv.id = 'typing-indicator';
+        typingDiv.className = 'message assistant-message mb-3';
+        
+        typingDiv.innerHTML = `
+            <div class="message-avatar">
+                <i data-feather="cpu" class="text-primary"></i>
+            </div>
+            <div class="message-content">
+                <div class="typing-indicator">
+                    <span class="me-2">AI is thinking</span>
+                    <div class="typing-dots">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        chatMessages.appendChild(typingDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        feather.replace();
+    }
+
+    function removeTypingIndicator() {
+        const typingIndicator = document.getElementById('typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
+    }
+
+    function getResponse(userMessage) {
+        const lowerMessage = userMessage.toLowerCase();
+        
+        for (const [key, responseData] of Object.entries(demoResponses)) {
+            if (key === 'default') continue;
+            
+            if (responseData.keywords.some(keyword => lowerMessage.includes(keyword))) {
+                return responseData.response;
+            }
+        }
+        
+        return demoResponses.default.response;
+    }
+
+    function handleSubmit(message) {
+        if (!message.trim()) return;
+        
+        // Add user message
+        addMessage(message, true);
+        
+        // Show typing indicator
+        showTypingIndicator();
+        
+        // Simulate AI response delay
+        setTimeout(() => {
+            removeTypingIndicator();
+            const response = getResponse(message);
+            addMessage(response, false);
+        }, 1500 + Math.random() * 1000); // 1.5-2.5 second delay
+        
+        messageInput.value = '';
+    }
+
+    // Handle form submission
+    chatForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const message = messageInput.value;
+        handleSubmit(message);
+    });
+
+    // Handle suggestion buttons
+    suggestionBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const suggestion = this.textContent;
+            messageInput.value = suggestion;
+            handleSubmit(suggestion);
+        });
+    });
+
+    // Focus on input
+    messageInput.focus();
+});
+</script>
+{% endblock %}
