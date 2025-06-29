@@ -19,4 +19,8 @@ dependencies = [
     "langchain-openai>=0.3.12",
     "fastembed>=0.6.0",
     "trafilatura>=2.0.0",
+    "flask-login>=0.6.3",
+    "oauthlib>=3.3.1",
+    "pyjwt>=2.10.1",
+    "flask-dance>=7.1.0",
 ]

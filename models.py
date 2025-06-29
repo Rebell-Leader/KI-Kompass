@@ -1,15 +1,21 @@
 from datetime import datetime
 from database import db
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Float, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Float, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
+from flask_dance.consumer.storage.sqla import OAuthConsumerMixin
+from flask_login import UserMixin
 
-class User(db.Model):
+# User model for Replit Auth
+class User(UserMixin, db.Model):
     __tablename__ = 'users'
     
-    id = Column(Integer, primary_key=True)
-    username = Column(String(64), unique=True, nullable=False)
-    email = Column(String(120), unique=True, nullable=False)
-    password_hash = Column(String(256), nullable=False)
+    id = Column(String, primary_key=True)  # Replit user ID (string)
+    email = Column(String(120), unique=True, nullable=True)
+    first_name = Column(String(120), nullable=True)
+    last_name = Column(String(120), nullable=True)
+    profile_image_url = Column(String(512), nullable=True)
+    
+    # KI Kompass specific fields
     full_name = Column(String(120))
     nationality = Column(String(64))
     visa_type = Column(String(64))
@@ -27,13 +33,26 @@ class User(db.Model):
     pipelines = relationship("IntegrationPipeline", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
-        return f"<User {self.username}>"
+        return f"<User {self.id}>"
+
+# OAuth model for Replit Auth token storage
+class OAuth(OAuthConsumerMixin, db.Model):
+    user_id = Column(String, ForeignKey(User.id))
+    browser_session_key = Column(String, nullable=False)
+    user = relationship(User)
+
+    __table_args__ = (UniqueConstraint(
+        'user_id',
+        'browser_session_key',
+        'provider',
+        name='uq_user_browser_session_key_provider',
+    ),)
 
 class IntegrationPipeline(db.Model):
     __tablename__ = 'integration_pipelines'
     
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_id = Column(String, ForeignKey('users.id'), nullable=False)
     title = Column(String(120), default="My Relocation Pipeline")
     description = Column(Text)
     progress = Column(Float, default=0.0)
@@ -96,7 +115,7 @@ class ChatMessage(db.Model):
     __tablename__ = 'chat_messages'
     
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_id = Column(String, ForeignKey('users.id'), nullable=False)
     role = Column(String(16), nullable=False)  # 'user' or 'assistant'
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
