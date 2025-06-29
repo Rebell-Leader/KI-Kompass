@@ -175,7 +175,7 @@ class NotificationService:
                 })
             
             # AI Assistant introduction
-            if user.onboarded and not hasattr(user, 'has_used_chat'):
+            if user.onboarded == True and not hasattr(user, 'has_used_chat'):
                 notifications.append({
                     'id': f"ai_intro_{user.id}",
                     'type': 'feature',
