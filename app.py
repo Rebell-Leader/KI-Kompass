@@ -503,12 +503,50 @@ def add_task_to_pipeline():
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/notifications', methods=['GET'])
+@login_required
+def get_notifications():
+    """Get notifications for the current user"""
+    try:
+        from services.notification_service import NotificationService
+        user_id = session['user_id']
+        
+        notifications = NotificationService.get_user_notifications(user_id)
+        
+        return jsonify({
+            "success": True,
+            "notifications": notifications,
+            "count": len(notifications)
+        })
+        
+    except Exception as e:
+        logger.error(f"Notifications API error: {str(e)}")
+        return jsonify({
+            "error": "Failed to retrieve notifications",
+            "message": str(e)
+        }), 500
+
+@app.route('/api/notifications/<notification_id>/read', methods=['POST'])
+@login_required
+def mark_notification_read(notification_id):
+    """Mark a notification as read"""
+    try:
+        from services.notification_service import NotificationService
+        user_id = session['user_id']
+        
+        success = NotificationService.mark_notification_read(user_id, notification_id)
+        
+        if success:
+            return jsonify({"success": True, "message": "Notification marked as read"})
+        else:
+            return jsonify({"error": "Failed to mark notification as read"}), 400
+            
+    except Exception as e:
+        logger.error(f"Mark notification read error: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
 # Register blueprints
 from routers.users import users_bp
 app.register_blueprint(users_bp, url_prefix='/api')
 
 # Database already initialized in database.py
-
-# Import routes after app is created
-# These imports will be used in a later stage to register blueprints
-# Currently, the main routes are defined directly in this file
