@@ -43,7 +43,7 @@ def get_embeddings():
     
     # Fallback to OpenAI embeddings
     logger.info("Using OpenAI for embeddings")
-    return OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+    return OpenAIEmbeddings(api_key=OPENAI_API_KEY)
 
 # Initialize language model
 def get_llm():
@@ -62,7 +62,7 @@ def get_llm():
                 model=FEATHERLESS_MODEL,
                 api_key=FEATHERLESS_API_KEY,
                 base_url=FEATHERLESS_BASE_URL,
-                request_timeout=5.0,  # 5 seconds timeout to prevent worker timeouts
+                timeout=5.0,  # 5 seconds timeout to prevent worker timeouts
                 max_retries=0,  # Don't retry to avoid worker timeouts
                 streaming=False  # Disable streaming for now to debug the timeout issue
             )
@@ -77,7 +77,7 @@ def get_llm():
                 temperature=0.5,  # Lower temperature for more focused responses
                 model="gpt-3.5-turbo",  # Use 3.5-turbo for cost-effectiveness and speed
                 api_key=OPENAI_API_KEY,
-                request_timeout=5.0,  # 5 seconds timeout
+                timeout=5.0,  # 5 seconds timeout
                 max_retries=0,  # Don't retry to avoid worker timeouts
                 streaming=False  # Disable streaming for now to debug the timeout issue
             )
@@ -93,52 +93,77 @@ def get_knowledge_base():
     """
     Creates or loads a Qdrant vector store for relocation knowledge.
     
-    In a production environment, you would:
-    1. Ingest documents about relocation to Munich
-    2. Split them into chunks
-    3. Create embeddings and store in Qdrant
-    
-    For this MVP, we're creating a simple in-memory store with a few key pieces of information.
+    Attempts to fetch real-time data from Munich government services,
+    with fallback to curated knowledge base if scraping fails.
     """
     embeddings = get_embeddings()
+    texts = []
     
-    # Define some key pieces of information about relocating to Munich
-    texts = [
-        # Anmeldung (Registration)
-        "When you move to Munich, you must register your address at the local Bürgerbüro (citizen's office) within 14 days of arrival. This process is called 'Anmeldung'. You'll need your passport and a confirmation from your landlord (Wohnungsgeberbestätigung).",
+    try:
+        # Try to get updated information from Munich government services
+        from services.web_scraper import MunichGovScraper
+        scraper = MunichGovScraper()
         
-        # Tax ID
-        "After registering your address, you'll receive your tax identification number (Steuer-ID) by mail within 2-4 weeks. You'll need this for employment in Germany.",
+        logger.info("Attempting to fetch live data from Munich government services")
+        live_knowledge = scraper.get_updated_knowledge_base()
         
-        # Residence Permit
-        "Non-EU citizens must apply for a residence permit at the Foreign Office (Ausländerbehörde) within 90 days of arrival or before their visa expires. Required documents typically include passport, biometric photos, proof of address, proof of health insurance, and proof of financial means.",
-        
-        # Health Insurance
-        "Health insurance is mandatory in Germany. Public health insurance (gesetzliche Krankenversicherung) is provided by various companies like TK, AOK, or Barmer. If you're employed, your employer will register you and split the cost. Self-employed individuals can choose between public and private insurance.",
-        
-        # Bank Account
-        "Opening a bank account (Girokonto) is essential for rent payments, receiving salary, and daily transactions. Popular options include Deutsche Bank, Commerzbank, and online banks like N26 or DKB. You'll need your passport and registration certificate (Anmeldebestätigung).",
-        
-        # Transportation
-        "Munich has an excellent public transportation system operated by MVV, including U-Bahn (subway), S-Bahn (suburban trains), trams, and buses. Monthly passes (IsarCard) offer significant savings compared to individual tickets.",
-        
-        # German Courses
-        "Learning German is crucial for integration. The Volkshochschule München (VHS) offers affordable language courses at all levels. Goethe-Institut provides more intensive but costlier options. Online platforms like Duolingo or Babbel can supplement formal learning.",
-        
-        # Housing
-        "Finding accommodation in Munich is challenging due to high demand. Websites like ImmobilienScout24, WG-Gesucht, and Mr. Lodge are popular for apartment hunting. Expect to pay a deposit (Kaution) of 2-3 months' rent and possibly a commission fee (Provision) if using an agent.",
-        
-        # Integration Course
-        "For non-EU citizens, integration courses (Integrationskurs) are often mandatory. These include language lessons and orientation modules about German culture, history, and legal system. The Federal Office for Migration and Refugees (BAMF) subsidizes these courses."
-    ]
+        if live_knowledge:
+            logger.info(f"Successfully retrieved {len(live_knowledge)} live service pages")
+            # Convert scraped data to text format for vector store
+            for item in live_knowledge:
+                text_content = f"{item['title']}: {item['content']}"
+                if len(text_content) > 2000:  # Truncate very long content
+                    text_content = text_content[:2000] + "..."
+                texts.append(text_content)
+        else:
+            logger.warning("No live data retrieved, using fallback knowledge base")
+            
+    except Exception as e:
+        logger.warning(f"Failed to fetch live data: {str(e)}, using fallback knowledge base")
     
-    # Create a simple in-memory vector store
-    return Qdrant.from_texts(
-        texts=texts,
-        embedding=embeddings,
-        location=":memory:",  # In-memory storage for this example
-        collection_name="munich_relocation_kb"
-    )
+    # If no live data or scraping failed, use curated fallback knowledge
+    if not texts:
+        logger.info("Using curated fallback knowledge base")
+        texts = [
+            # Anmeldung (Registration)
+            "When you move to Munich, you must register your address at the local Bürgerbüro (citizen's office) within 14 days of arrival. This process is called 'Anmeldung'. You'll need your passport and a confirmation from your landlord (Wohnungsgeberbestätigung).",
+            
+            # Tax ID
+            "After registering your address, you'll receive your tax identification number (Steuer-ID) by mail within 2-4 weeks. You'll need this for employment in Germany.",
+            
+            # Residence Permit
+            "Non-EU citizens must apply for a residence permit at the Foreign Office (Ausländerbehörde) within 90 days of arrival or before their visa expires. Required documents typically include passport, biometric photos, proof of address, proof of health insurance, and proof of financial means.",
+            
+            # Health Insurance
+            "Health insurance is mandatory in Germany. Public health insurance (gesetzliche Krankenversicherung) is provided by various companies like TK, AOK, or Barmer. If you're employed, your employer will register you and split the cost. Self-employed individuals can choose between public and private insurance.",
+            
+            # Bank Account
+            "Opening a bank account (Girokonto) is essential for rent payments, receiving salary, and daily transactions. Popular options include Deutsche Bank, Commerzbank, and online banks like N26 or DKB. You'll need your passport and registration certificate (Anmeldebestätigung).",
+            
+            # Transportation
+            "Munich has an excellent public transportation system operated by MVV, including U-Bahn (subway), S-Bahn (suburban trains), trams, and buses. Monthly passes (IsarCard) offer significant savings compared to individual tickets.",
+            
+            # German Courses
+            "Learning German is crucial for integration. The Volkshochschule München (VHS) offers affordable language courses at all levels. Goethe-Institut provides more intensive but costlier options. Online platforms like Duolingo or Babbel can supplement formal learning.",
+            
+            # Housing
+            "Finding accommodation in Munich is challenging due to high demand. Websites like ImmobilienScout24, WG-Gesucht, and Mr. Lodge are popular for apartment hunting. Expect to pay a deposit (Kaution) of 2-3 months' rent and possibly a commission fee (Provision) if using an agent.",
+            
+            # Integration Course
+            "For non-EU citizens, integration courses (Integrationskurs) are often mandatory. These include language lessons and orientation modules about German culture, history, and legal system. The Federal Office for Migration and Refugees (BAMF) subsidizes these courses."
+        ]
+    
+    # Create vector store with available knowledge
+    try:
+        return Qdrant.from_texts(
+            texts=texts,
+            embedding=embeddings,
+            location=":memory:",
+            collection_name="munich_relocation_kb"
+        )
+    except Exception as e:
+        logger.error(f"Failed to create vector store: {str(e)}")
+        raise e
 
 # Create a conversational chain with retrieval
 def get_conversation_chain():
