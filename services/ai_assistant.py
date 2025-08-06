@@ -54,9 +54,9 @@ def get_ai_response(query, user, conversation_id=None):
             "german_level": user.german_level or "Not specified"
         }
         
-        # Simplified approach - always use the basic chain to avoid timeouts
-        # This removes the complexity of the conversational retrieval chain
-        is_relocation_query = False  # Force using the basic chain
+        # Determine if this is a relocation-specific query
+        relocation_keywords = ['munich', 'germany', 'visa', 'registration', 'anmeldung', 'residence', 'permit', 'housing', 'apartment', 'bank', 'insurance', 'tax', 'bureaucracy']
+        is_relocation_query = any(keyword in query.lower() for keyword in relocation_keywords)
         
         # Get previous conversation history for context
         prev_messages = ChatMessage.get_conversation(user.id, conversation_id)

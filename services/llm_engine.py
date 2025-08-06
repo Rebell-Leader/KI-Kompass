@@ -108,27 +108,9 @@ def get_knowledge_base():
     embeddings = get_embeddings()
     texts = []
     
-    try:
-        # Try to get updated information from Munich government services
-        from services.web_scraper import MunichGovScraper
-        scraper = MunichGovScraper()
-        
-        logger.info("Attempting to fetch live data from Munich government services")
-        live_knowledge = scraper.get_updated_knowledge_base()
-        
-        if live_knowledge:
-            logger.info(f"Successfully retrieved {len(live_knowledge)} live service pages")
-            # Convert scraped data to text format for vector store
-            for item in live_knowledge:
-                text_content = f"{item['title']}: {item['content']}"
-                if len(text_content) > 2000:  # Truncate very long content
-                    text_content = text_content[:2000] + "..."
-                texts.append(text_content)
-        else:
-            logger.warning("No live data retrieved, using fallback knowledge base")
-            
-    except Exception as e:
-        logger.warning(f"Failed to fetch live data: {str(e)}, using fallback knowledge base")
+    # Note: Web scraping functionality disabled for MVP
+    # Will be implemented in future versions
+    logger.info("Using curated knowledge base (web scraping not yet implemented)")
     
     # If no live data or scraping failed, use curated fallback knowledge
     if not texts:

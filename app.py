@@ -44,12 +44,7 @@ login_manager.init_app(app)
 replit_bp = make_replit_blueprint()
 app.register_blueprint(replit_bp, url_prefix="/auth")
 
-# Create tables
-with app.app_context():
-    # Import models to ensure they're registered
-    import models  # noqa: F401
-    db.create_all()
-    logging.info("Database tables created")
+# Database tables will be created on first request in routes.py
 
 # Import routes after app and database are initialized
 import routes  # noqa: F401
