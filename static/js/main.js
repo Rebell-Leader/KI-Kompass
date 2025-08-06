@@ -34,37 +34,100 @@ document.addEventListener('DOMContentLoaded', function() {
  * Initialize flash message functionality
  */
 function initFlashMessages() {
+    // Auto-hide flash messages after 5 seconds
     const flashMessages = document.querySelectorAll('.alert');
+    flashMessages.forEach(function(message) {
+        if (message) {
+            // Add close button if not present
+            if (!message.querySelector('.close-btn')) {
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '×';
+                closeBtn.className = 'close-btn';
+                closeBtn.style.cssText = 'float: right; background: none; border: none; font-size: 20px; cursor: pointer; color: inherit;';
+                closeBtn.onclick = function() {
+                    hideFlashMessage(message);
+                };
+                message.insertBefore(closeBtn, message.firstChild);
+            }
 
-    flashMessages.forEach(message => {
-        // Add close button if not present
-        if (!message.querySelector('.close-btn')) {
-            const closeBtn = document.createElement('button');
-            closeBtn.classList.add('close-btn');
-            closeBtn.innerHTML = '&times;';
-            closeBtn.style.float = 'right';
-            closeBtn.style.background = 'none';
-            closeBtn.style.border = 'none';
-            closeBtn.style.fontSize = '20px';
-            closeBtn.style.cursor = 'pointer';
-            closeBtn.style.marginLeft = '15px';
-            message.prepend(closeBtn);
+            // Auto-hide after 5 seconds
+            setTimeout(function() {
+                hideFlashMessage(message);
+            }, 5000);
+        }
+    });
+}
 
-            closeBtn.addEventListener('click', () => {
-                message.style.opacity = '0';
-                setTimeout(() => {
-                    message.style.display = 'none';
-                }, 300);
+function hideFlashMessage(message) {
+    if (message && message.parentNode) {
+        message.style.opacity = '0';
+        message.style.transition = 'opacity 0.3s';
+        setTimeout(function() {
+            if (message.parentNode) {
+                message.parentNode.removeChild(message);
+            }
+        }, 300);
+    }
+}
+
+function showFlashMessage(text, type = 'info') {
+    const alertClass = type === 'error' ? 'alert-danger' : 
+                     type === 'success' ? 'alert-success' : 
+                     type === 'warning' ? 'alert-warning' : 'alert-info';
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `alert ${alertClass}`;
+    messageDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; min-width: 300px;';
+    messageDiv.innerHTML = text;
+
+    document.body.appendChild(messageDiv);
+
+    // Auto-hide and add close functionality
+    const closeBtn = document.createElement('button');
+    closeBtn.innerHTML = '×';
+    closeBtn.className = 'close-btn';
+    closeBtn.style.cssText = 'float: right; background: none; border: none; font-size: 20px; cursor: pointer; color: inherit; margin-left: 10px;';
+    closeBtn.onclick = function() {
+        hideFlashMessage(messageDiv);
+    };
+    messageDiv.insertBefore(closeBtn, messageDiv.firstChild);
+
+    setTimeout(function() {
+        hideFlashMessage(messageDiv);
+    }, 5000);
+}
+
+/**
+ * Initialize tooltip functionality
+ */
+function initTooltips() {
+    const tooltipElements = document.querySelectorAll('[data-tooltip]');
+    tooltipElements.forEach(function(element) {
+        if (element) {
+            element.addEventListener('mouseenter', function() {
+                const tooltipText = this.dataset.tooltip;
+                if (tooltipText) {
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'tooltip';
+                    tooltip.textContent = tooltipText;
+                    tooltip.style.cssText = 'position: absolute; background: #333; color: white; padding: 5px 10px; border-radius: 4px; font-size: 12px; z-index: 1000; pointer-events: none;';
+                    document.body.appendChild(tooltip);
+
+                    const rect = this.getBoundingClientRect();
+                    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+                    tooltip.style.top = (rect.top - tooltip.offsetHeight - 5) + 'px';
+
+                    this.tooltip = tooltip;
+                }
+            });
+
+            element.addEventListener('mouseleave', function() {
+                if (this.tooltip) {
+                    document.body.removeChild(this.tooltip);
+                    this.tooltip = null;
+                }
             });
         }
-
-        // Auto dismiss after 5 seconds
-        setTimeout(() => {
-            message.style.opacity = '0';
-            setTimeout(() => {
-                message.style.display = 'none';
-            }, 300);
-        }, 5000);
     });
 }
 
@@ -72,115 +135,29 @@ function initFlashMessages() {
  * Initialize form validation
  */
 function initFormValidation() {
-    const forms = document.querySelectorAll('form');
+    const forms = document.querySelectorAll('form[data-validate]');
+    forms.forEach(function(form) {
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const requiredFields = this.querySelectorAll('[required]');
+                let isValid = true;
 
-    forms.forEach(form => {
-        form.addEventListener('submit', function(event) {
-            const requiredFields = form.querySelectorAll('[required]');
-            let isValid = true;
-
-            requiredFields.forEach(field => {
-                if (!field.value.trim()) {
-                    isValid = false;
-
-                    // Add error styling
-                    field.classList.add('is-invalid');
-
-                    // Create error message if doesn't exist
-                    let errorMessage = field.parentNode.querySelector('.error-message');
-                    if (!errorMessage) {
-                        errorMessage = document.createElement('div');
-                        errorMessage.classList.add('error-message');
-                        errorMessage.style.color = '#DC3545';
-                        errorMessage.style.fontSize = '14px';
-                        errorMessage.style.marginTop = '4px';
-                        field.parentNode.appendChild(errorMessage);
+                requiredFields.forEach(function(field) {
+                    if (!field.value.trim()) {
+                        isValid = false;
+                        field.classList.add('error');
+                        field.addEventListener('input', function() {
+                            this.classList.remove('error');
+                        }, { once: true });
                     }
+                });
 
-                    errorMessage.textContent = `${field.getAttribute('data-error-message') || 'This field is required'}`;
-                } else {
-                    field.classList.remove('is-invalid');
-                    const errorMessage = field.parentNode.querySelector('.error-message');
-                    if (errorMessage) {
-                        errorMessage.remove();
-                    }
+                if (!isValid) {
+                    e.preventDefault();
+                    showFlashMessage('Please fill in all required fields', 'error');
                 }
             });
-
-            if (!isValid) {
-                event.preventDefault();
-            }
-        });
-
-        // Live validation as user types
-        const inputs = form.querySelectorAll('input, select, textarea');
-        inputs.forEach(input => {
-            input.addEventListener('input', function() {
-                if (input.hasAttribute('required') && !input.value.trim()) {
-                    input.classList.add('is-invalid');
-                } else {
-                    input.classList.remove('is-invalid');
-                    const errorMessage = input.parentNode.querySelector('.error-message');
-                    if (errorMessage) {
-                        errorMessage.remove();
-                    }
-                }
-            });
-        });
-    });
-}
-
-/**
- * Initialize tooltips
- */
-function initTooltips() {
-    const tooltips = document.querySelectorAll('[data-tooltip]');
-
-    tooltips.forEach(element => {
-        element.style.position = 'relative';
-        element.style.cursor = 'pointer';
-
-        element.addEventListener('mouseenter', function() {
-            const tooltip = document.createElement('div');
-            tooltip.classList.add('tooltip');
-            tooltip.textContent = element.getAttribute('data-tooltip');
-
-            // Style the tooltip
-            tooltip.style.position = 'absolute';
-            tooltip.style.bottom = '100%';
-            tooltip.style.left = '50%';
-            tooltip.style.transform = 'translateX(-50%)';
-            tooltip.style.marginBottom = '5px';
-            tooltip.style.backgroundColor = '#2C3E50';
-            tooltip.style.color = '#FFFFFF';
-            tooltip.style.padding = '6px 10px';
-            tooltip.style.borderRadius = '4px';
-            tooltip.style.fontSize = '14px';
-            tooltip.style.zIndex = '1000';
-            tooltip.style.whiteSpace = 'nowrap';
-
-            // Add arrow
-            tooltip.style.boxShadow = '0 2px 4px rgba(0,0,0,0.2)';
-            tooltip.style.opacity = '0';
-            tooltip.style.transition = 'opacity 0.3s';
-
-            element.appendChild(tooltip);
-
-            // Show after a small delay to prevent flickering
-            setTimeout(() => {
-                tooltip.style.opacity = '1';
-            }, 10);
-        });
-
-        element.addEventListener('mouseleave', function() {
-            const tooltip = element.querySelector('.tooltip');
-            if (tooltip) {
-                tooltip.style.opacity = '0';
-                setTimeout(() => {
-                    tooltip.remove();
-                }, 300);
-            }
-        });
+        }
     });
 }
 
