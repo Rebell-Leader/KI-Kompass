@@ -1,10 +1,9 @@
 import os
 import logging
-from langchain.chains import LLMChain
+from langchain.chains import LLMChain, ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain_community.vectorstores import Qdrant
-from langchain.chains import ConversationalRetrievalChain
 
 try:
     from langchain_openai import ChatOpenAI, OpenAIEmbeddings

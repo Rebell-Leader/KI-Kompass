@@ -18,14 +18,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Initialize tab functionality if elements exist
     const tabElements = document.querySelectorAll('[data-tab]');
-    tabElements.forEach(function(tab) {
-        if (tab && typeof tab.addEventListener === 'function') {
-            tab.addEventListener('click', function() {
-                // Tab click handling
-                console.log('Tab clicked:', this.dataset.tab);
-            });
-        }
-    });
+    if (tabElements.length > 0) {
+        tabElements.forEach(function(tab) {
+            if (tab && typeof tab.addEventListener === 'function') {
+                tab.addEventListener('click', function() {
+                    // Tab click handling
+                    console.log('Tab clicked:', this.dataset.tab);
+                });
+            }
+        });
+    }
 });
 
 /**
