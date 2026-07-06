@@ -41,6 +41,7 @@ function initChatbot() {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
             },
             body: JSON.stringify({
                 message: message,

@@ -290,6 +290,7 @@ function updateTaskStatus(taskId, completed, notes = '') {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
         },
         body: JSON.stringify({
             task_id: taskId,
@@ -447,6 +448,7 @@ function initOptionalTasks() {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
                     },
                     body: JSON.stringify({ task_id: taskId })
                 })
@@ -580,6 +582,7 @@ function initPipelineRegeneration() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
                 }
             })
             .then(response => response.json())

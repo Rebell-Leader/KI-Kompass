@@ -211,6 +211,7 @@ function initTaskManagement() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
                 },
                 body: JSON.stringify({
                     task_id: taskId,
@@ -270,6 +271,7 @@ function initTaskManagement() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken(),
                 },
                 body: JSON.stringify({
                     task_id: taskId,

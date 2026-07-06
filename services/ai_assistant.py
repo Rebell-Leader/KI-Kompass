@@ -65,17 +65,7 @@ def get_ai_response(query, user, conversation_id=None):
             "german_level": user.german_level or "Not specified"
         }
         
-        # Determine if this is a relocation-specific query
-        relocation_keywords = ['munich', 'germany', 'visa', 'registration', 'anmeldung', 'residence', 'permit', 'housing', 'apartment', 'bank', 'insurance', 'tax', 'bureaucracy']
-        is_relocation_query = any(keyword in query.lower() for keyword in relocation_keywords)
-        
-        logger.info(f"Processing query: '{query}' (relocation-specific: {is_relocation_query}, conversation: {conversation_id})")
-
-        # For the basic chain (no chat_history input), summarize prior topics inline
-        context_prompt = ""
-        if chat_history:
-            conversation_summary = ChatMessage.get_conversation_summary(user.id, conversation_id)
-            context_prompt = f"Based on our conversation about {conversation_summary}, "
+        logger.info(f"Processing query: '{query}' (conversation: {conversation_id})")
         
         # Attempt with robust error handling
         try:
@@ -90,23 +80,23 @@ def get_ai_response(query, user, conversation_id=None):
                 ai_response = f"Hello{' ' + user.full_name if user.full_name else ''}! I'm KI Kompass, your Munich relocation assistant. How can I help you today?"
             else:
                 # Import lazily so the app can start without the LLM stack installed
-                from services.llm_engine import get_conversation_chain, get_basic_chain
+                from services.llm_engine import get_answer_chain, retrieve_context
 
-                # Only use LLM for more complex queries
-                if is_relocation_query:
-                    # Use conversational retrieval chain for relocation-specific queries,
-                    # passing this conversation's history from the database
-                    chain = get_conversation_chain()
-                    response = chain.invoke({"question": query, "chat_history": chat_history})
-                    ai_response = response.get("answer", "I don't have specific information about that aspect of relocation.")
-                else:
-                    # Use basic chain for general queries
-                    chain = get_basic_chain()
-                    response = chain.invoke({
-                        "user_profile": str(user_profile),
-                        "query": context_prompt + query
-                    })
-                    ai_response = response.get("text", "I'm not sure how to answer that question.")
+                # Retrieve relevant official knowledge and format recent history
+                # (last 5 exchanges keeps the prompt bounded)
+                context = retrieve_context(query)
+                history_text = "\n".join(
+                    f"User: {u}\nAssistant: {a}" for u, a in chat_history[-5:]
+                ) or "(no previous messages)"
+
+                chain = get_answer_chain()
+                response = chain.invoke({
+                    "context": context,
+                    "user_profile": str(user_profile),
+                    "chat_history": history_text,
+                    "question": query
+                })
+                ai_response = response.get("text", "I'm not sure how to answer that question.")
 
                 logger.info(f"LLM response generated in {time.time() - start_time:.2f}s")
             

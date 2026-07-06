@@ -1,6 +1,6 @@
 import os
 import logging
-from langchain.chains import LLMChain, ConversationalRetrievalChain
+from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 from langchain_community.vectorstores import Qdrant
 
@@ -98,8 +98,7 @@ def get_llm():
 # Cached instances - building the vector store (and downloading the embedding
 # model) is far too slow to repeat on every chat request
 _vectorstore = None
-_conversation_chain = None
-_basic_chain = None
+_answer_chain = None
 
 # Get knowledge base for relocation to Munich
 def get_knowledge_base():
@@ -165,61 +164,53 @@ def get_knowledge_base():
         logger.error(f"Failed to create vector store: {str(e)}")
         raise e
 
-# Create a conversational chain with retrieval
-def get_conversation_chain():
-    """Retrieval chain without attached memory - the caller passes chat_history
-    per invoke, built from the conversation stored in the database. A shared
-    in-process memory would leak context between users."""
-    global _conversation_chain
-    if _conversation_chain is not None:
-        return _conversation_chain
-
-    llm = get_llm()
+def retrieve_context(query, k=3):
+    """Retrieve the most relevant knowledge base passages for a query"""
     vectorstore = get_knowledge_base()
+    docs = vectorstore.similarity_search(query, k=k)
+    return "\n\n".join(doc.page_content for doc in docs)
 
-    retriever = vectorstore.as_retriever(
-        search_type="similarity",
-        search_kwargs={"k": 3}
-    )
-
-    _conversation_chain = ConversationalRetrievalChain.from_llm(
-        llm=llm,
-        retriever=retriever,
-        verbose=True
-    )
-
-    return _conversation_chain
-
-# For basic responses without knowledge retrieval
-def get_basic_chain():
-    global _basic_chain
-    if _basic_chain is not None:
-        return _basic_chain
+# Single answer chain: guardrails + user profile + retrieved context + history.
+# The caller supplies chat_history from the database per invoke, so memory is
+# per-conversation and never shared between users.
+def get_answer_chain():
+    global _answer_chain
+    if _answer_chain is not None:
+        return _answer_chain
 
     llm = get_llm()
-    
-    template = """
-    You are KI Kompass, an AI assistant helping people relocate to Munich, Germany.
-    Be friendly, helpful, and provide very concise information.
-    Keep your responses under 80 words to avoid timeouts.
-    
-    User profile: {user_profile}
-    
-    User question: {query}
-    
-    Your short, concise response:
-    """
-    
+
+    template = """You are KI Kompass, an AI assistant helping people relocate to and integrate in Munich, Germany.
+
+Follow these rules strictly:
+- You provide general guidance only, NOT legal advice. For visa, residence permit, or other legal decisions, recommend confirming with the responsible authority (e.g. the Munich Kreisverwaltungsreferat/Auslaenderbehoerde) or a qualified advisor.
+- Prefer the official information provided below. If it does not cover the question, or you are not sure, say so plainly instead of guessing.
+- Procedures, fees, opening hours and required documents change over time. When it matters, remind the user to verify current details on the official website of the office in question.
+- Tailor your answer to the user's profile where relevant (visa type, family situation, employment, German level).
+- Be friendly and concise: under 150 words.
+
+Official information:
+{context}
+
+User profile: {user_profile}
+
+Conversation so far:
+{chat_history}
+
+User question: {question}
+
+Your response:"""
+
     prompt = PromptTemplate(
-        input_variables=["user_profile", "query"],
+        input_variables=["context", "user_profile", "chat_history", "question"],
         template=template
     )
-    
-    _basic_chain = LLMChain(
+
+    _answer_chain = LLMChain(
         llm=llm,
         prompt=prompt,
         verbose=True,
-        output_key="text"  # Fix the output key to match what ai_assistant.py expects
+        output_key="text"
     )
 
-    return _basic_chain
+    return _answer_chain

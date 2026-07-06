@@ -215,6 +215,7 @@
                                     
                                     <div class="task-actions ms-3">
                                         <form method="POST" action="{{ url_for('demo_update_task', task_id=task.id) }}" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <input type="hidden" name="completed" value="true">
                                             <button type="submit" class="btn btn-success btn-sm" title="Mark as completed">
                                                 <i data-feather="check" width="16" height="16"></i>
@@ -289,6 +290,7 @@
                                 <small class="text-muted">{{ task.category.replace('_', ' ') }}</small>
                             </div>
                             <form method="POST" action="{{ url_for('demo_update_task', task_id=task.id) }}" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="completed" value="false">
                                 <button type="submit" class="btn btn-link btn-sm p-0 text-muted" title="Mark as incomplete">
                                     <i data-feather="rotate-ccw" width="14" height="14"></i>

@@ -2,6 +2,10 @@ import os
 import logging
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_migrate import Migrate
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -20,7 +24,8 @@ if not app.secret_key:
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1) # needed for url_for to generate with https
 
 # Session configuration for OAuth - critical for state persistence
-app.config['SESSION_COOKIE_SECURE'] = False  # Allow HTTP in development
+# Set SESSION_COOKIE_SECURE=true in production (HTTPS); default allows HTTP in development
+app.config['SESSION_COOKIE_SECURE'] = os.environ.get('SESSION_COOKIE_SECURE', '').lower() in ('1', 'true', 'yes')
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_NAME'] = 'ki_kompass_session'
@@ -46,6 +51,18 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 # Initialize SQLAlchemy
 db = SQLAlchemy(app, model_class=Base)
 
+# Schema migrations (flask db migrate/upgrade)
+migrate = Migrate(app, db)
+
+# CSRF protection for all POST requests. Browser JS sends the token via the
+# X-CSRFToken header (exposed as a <meta> tag in base.html); server-rendered
+# forms include a hidden csrf_token field.
+csrf = CSRFProtect(app)
+
+# Rate limiting - applied per-route (see routes.py); in-memory storage is
+# sufficient for a single-process MVP deployment
+limiter = Limiter(get_remote_address, app=app, storage_uri="memory://")
+
 # Initialize Replit Auth
 from replit_auth import make_replit_blueprint, login_manager
 login_manager.init_app(app)
@@ -58,9 +75,12 @@ app.register_blueprint(replit_bp, url_prefix="/auth")
 import routes  # noqa: F401
 
 # Create tables and seed data at startup so every entry point
-# (demo mode, API, dashboard) finds an initialized database
-with app.app_context():
-    try:
-        routes.ensure_database_initialized()
-    except Exception as e:
-        logging.warning(f"Database initialization deferred (will retry on first request): {e}")
+# (demo mode, API, dashboard) finds an initialized database.
+# Set FLASK_SKIP_DB_CREATE=1 when running flask db migrate/upgrade so
+# Alembic sees the real schema state instead of freshly created tables.
+if not os.environ.get("FLASK_SKIP_DB_CREATE"):
+    with app.app_context():
+        try:
+            routes.ensure_database_initialized()
+        except Exception as e:
+            logging.warning(f"Database initialization deferred (will retry on first request): {e}")

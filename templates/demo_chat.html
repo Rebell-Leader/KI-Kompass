@@ -462,7 +462,10 @@ Could you be more specific about what aspect of moving to Munich you'd like help
         // AI service is not configured or the request fails
         fetch('/api/chat', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
             body: JSON.stringify({
                 message: message,
                 conversation_id: sessionStorage.getItem('demo_conversation_id') || null

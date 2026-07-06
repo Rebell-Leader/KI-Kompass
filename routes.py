@@ -1,6 +1,6 @@
 from flask import session, render_template, redirect, url_for, request, jsonify, flash
 from flask_login import current_user, login_required
-from app import app, db
+from app import app, db, csrf, limiter
 from replit_auth import require_login, make_replit_blueprint
 from models import User, IntegrationPipeline, ActionStep, TaskStatus, ChatMessage
 from services.pipeline_engine import generate_pipeline, calculate_progress
@@ -156,6 +156,41 @@ def profile():
     user = current_user
     return render_template('profile.html', user=user)
 
+@app.route('/profile/update', methods=['POST'])
+@require_login
+def update_profile():
+    """Update the current user's profile fields"""
+    user = current_user
+    try:
+        user.full_name = request.form.get('full_name') or user.full_name
+        user.nationality = request.form.get('nationality') or user.nationality
+        user.visa_type = request.form.get('visa_type') or user.visa_type
+        user.german_level = request.form.get('german_level') or user.german_level
+        user.employment_status = request.form.get('employment_status') or user.employment_status
+        user.spouse_nationality = request.form.get('spouse_nationality') or user.spouse_nationality
+
+        has_family = request.form.get('has_family')
+        if has_family is not None:
+            user.has_family = has_family == 'true'
+
+        num_children = request.form.get('num_children')
+        if num_children is not None and num_children != '':
+            user.num_children = int(num_children)
+
+        arrival_date_str = request.form.get('arrival_date')
+        if arrival_date_str:
+            user.arrival_date = datetime.strptime(arrival_date_str, '%Y-%m-%d')
+
+        db.session.commit()
+        flash('Profile updated successfully.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating profile for user {user.id}: {str(e)}")
+        flash('Error updating profile. Please try again.', 'error')
+
+    return redirect(url_for('profile'))
+
 @app.route('/chat')
 @require_login
 def chat():
@@ -164,6 +199,7 @@ def chat():
     return render_template('chat.html', user=user)
 
 @app.route('/api/chat', methods=['POST'])
+@limiter.limit("20 per minute; 300 per day")
 def api_chat():
     """API endpoint for chat messages (logged-in users and demo sessions)"""
     try:
@@ -427,6 +463,8 @@ def update_task(task_id):
 # Additional API endpoints for comprehensive testing
 
 @app.route('/api/users', methods=['POST'])
+@csrf.exempt  # external API endpoint, no browser session to protect
+@limiter.limit("30 per minute")
 def api_create_user():
     """Create a new user profile"""
     try:
@@ -467,6 +505,8 @@ def api_create_user():
         return jsonify({"error": "Failed to create user"}), 500
 
 @app.route('/api/pipelines', methods=['POST'])
+@csrf.exempt  # external API endpoint, no browser session to protect
+@limiter.limit("30 per minute")
 def api_create_pipeline():
     """Create a new integration pipeline for a user"""
     try:
@@ -582,10 +622,37 @@ def api_get_upcoming_tasks():
 
 # Demo Mode Routes
 
+def cleanup_stale_demo_users(max_age_hours=24):
+    """Delete demo users (and their pipelines/messages) older than max_age_hours.
+
+    Demo sessions that never hit /demo/end would otherwise accumulate forever.
+    Called opportunistically when a new demo starts.
+    """
+    try:
+        cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
+        stale_users = User.query.filter(
+            User.id.like('demo\\_%', escape='\\'),
+            User.created_at < cutoff
+        ).all()
+
+        for user in stale_users:
+            ChatMessage.query.filter_by(user_id=user.id).delete()
+            db.session.delete(user)  # cascades to pipelines and task statuses
+
+        if stale_users:
+            db.session.commit()
+            logger.info(f"Cleaned up {len(stale_users)} stale demo user(s)")
+
+    except Exception as e:
+        db.session.rollback()
+        logger.warning(f"Demo cleanup failed: {str(e)}")
+
 @app.route('/demo')
 def demo_mode():
     """Start demo mode - show onboarding directly"""
     try:
+        cleanup_stale_demo_users()
+
         # Create demo user with session ID
         demo_session_id = f"demo_{datetime.now().timestamp()}"
         
