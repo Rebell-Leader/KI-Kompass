@@ -3,7 +3,7 @@ from flask_login import current_user, login_required
 from app import app, db
 from replit_auth import require_login, make_replit_blueprint
 from models import User, IntegrationPipeline, ActionStep, TaskStatus, ChatMessage
-from services.pipeline_engine import generate_pipeline
+from services.pipeline_engine import generate_pipeline, calculate_progress
 from services.ai_assistant import get_ai_response
 from services.notification_service import NotificationService
 from datetime import datetime, timedelta
@@ -36,6 +36,24 @@ def ensure_database_initialized():
             logging.warning(f"Could not create performance indexes: {str(e)}")
         
         _db_initialized = True
+
+def build_task_data(task_status, action_step):
+    """Flatten a (TaskStatus, ActionStep) pair into the dict shape templates expect"""
+    return {
+        'id': task_status.id,
+        'title': action_step.title,
+        'description': action_step.description,
+        'category': action_step.category,
+        'priority': action_step.priority,
+        'estimated_time': action_step.estimated_time,
+        'timeline_offset': action_step.timeline_offset,
+        'deadline': task_status.deadline,
+        'completed': task_status.completed,
+        'notes': task_status.notes,
+        'url': action_step.url,
+        'address': action_step.address,
+        'required_documents': action_step.required_documents
+    }
 
 # Make session permanent and ensure OAuth state persistence
 @app.before_request
@@ -77,18 +95,21 @@ def dashboard():
             flash("Error creating your personalized pipeline. Please try again.", "error")
             return redirect(url_for('onboarding'))
     
-    # Get tasks with action step details
-    tasks = db.session.query(TaskStatus, ActionStep).join(
+    # Get tasks with action step details, flattened into the shape the template expects
+    task_rows = db.session.query(TaskStatus, ActionStep).join(
         ActionStep, TaskStatus.action_step_id == ActionStep.id
     ).filter(TaskStatus.pipeline_id == pipeline.id).all()
-    
+
+    tasks = [build_task_data(task_status, action_step) for task_status, action_step in task_rows]
+
     # Separate completed and upcoming tasks
-    completed_tasks = [task for task in tasks if task[0].completed]
-    upcoming_tasks = [task for task in tasks if not task[0].completed]
-    
-    return render_template('dashboard.html', 
-                         user=user, 
-                         pipeline=pipeline, 
+    completed_tasks = [task for task in tasks if task['completed']]
+    upcoming_tasks = [task for task in tasks if not task['completed']]
+    upcoming_tasks.sort(key=lambda x: (x['priority'], x['deadline'] or datetime.max))
+
+    return render_template('dashboard.html',
+                         user=user,
+                         pipeline=pipeline,
                          tasks=tasks,
                          completed_tasks=completed_tasks,
                          upcoming_tasks=upcoming_tasks,
@@ -108,7 +129,7 @@ def onboarding():
         user.visa_type = request.form.get('visa_type')
         user.has_family = request.form.get('has_family') == 'true'
         user.spouse_nationality = request.form.get('spouse_nationality')
-        user.num_children = int(request.form.get('num_children', 0))
+        user.num_children = int(request.form.get('num_children') or 0)
         user.employment_status = request.form.get('employment_status')
         user.german_level = request.form.get('german_level')
         user.onboarded = True
@@ -218,40 +239,82 @@ def mark_notification_read(notification_id):
         logger.error(f"Mark notification read error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+def _apply_task_update(task_id, owner_user_id, completed, notes):
+    """Update a task owned by the given user; returns (task_status, progress) or (None, None)"""
+    task_status = TaskStatus.query.join(
+        IntegrationPipeline, TaskStatus.pipeline_id == IntegrationPipeline.id
+    ).filter(
+        TaskStatus.id == task_id,
+        IntegrationPipeline.user_id == owner_user_id
+    ).first()
+
+    if not task_status:
+        return None, None
+
+    task_status.completed = completed
+    if notes is not None:
+        task_status.notes = notes
+    task_status.completion_date = datetime.utcnow() if completed else None
+    db.session.commit()
+
+    progress = calculate_progress(task_status.pipeline_id)
+    return task_status, progress
+
+def _current_task_owner_id():
+    """Resolve the user id owning tasks for this request (logged-in or demo session)"""
+    if current_user.is_authenticated:
+        return current_user.id
+    if session.get('demo_mode') and session.get('demo_user_id'):
+        return session['demo_user_id']
+    return None
+
+@app.route('/api/task/update', methods=['POST'])
+def api_task_update():
+    """Update task completion status (endpoint used by the frontend JS)"""
+    try:
+        owner_id = _current_task_owner_id()
+        if not owner_id:
+            return jsonify({"error": "Not authenticated"}), 401
+
+        data = request.get_json(silent=True) or {}
+        try:
+            task_id = int(data.get('task_id'))
+        except (TypeError, ValueError):
+            return jsonify({"error": "task_id is required"}), 400
+
+        task_status, progress = _apply_task_update(
+            task_id, owner_id,
+            completed=bool(data.get('completed', False)),
+            notes=data.get('notes', '')
+        )
+        if not task_status:
+            return jsonify({"error": "Task not found"}), 404
+
+        return jsonify({"success": True, "progress": progress, "message": "Task updated successfully"})
+
+    except Exception as e:
+        logger.error(f"Update task error: {str(e)}")
+        return jsonify({"error": "Failed to update task"}), 500
+
 @app.route('/api/tasks/<int:task_id>/update', methods=['POST'])
 @require_login
 def update_task(task_id):
     """Update task completion status"""
     try:
-        user = current_user
-        data = request.json
-        completed = data.get('completed', False)
-        notes = data.get('notes', '')
-        
-        # Get the task status
-        task_status = TaskStatus.query.filter_by(
-            id=task_id,
-            pipeline__user_id=user.id
-        ).first()
-        
+        data = request.get_json(silent=True) or {}
+        task_status, progress = _apply_task_update(
+            task_id, current_user.id,
+            completed=bool(data.get('completed', False)),
+            notes=data.get('notes', '')
+        )
         if not task_status:
             return jsonify({"error": "Task not found"}), 404
-        
-        # Update task status
-        task_status.completed = completed
-        task_status.notes = notes
-        if completed:
-            task_status.completion_date = datetime.utcnow()
-        else:
-            task_status.completion_date = None
-        
-        db.session.commit()
-        
-        return jsonify({"success": True, "message": "Task updated successfully"})
-        
+
+        return jsonify({"success": True, "progress": progress, "message": "Task updated successfully"})
+
     except Exception as e:
         logger.error(f"Update task error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to update task"}), 500
 
 # Additional API endpoints for comprehensive testing
 
@@ -461,7 +524,7 @@ def demo_onboarding_submit():
         arrival_date_str = request.form.get('arrival_date')
         has_family = request.form.get('has_family') == 'true'
         spouse_nationality = request.form.get('spouse_nationality', '')
-        num_children = int(request.form.get('num_children', 0))
+        num_children = int(request.form.get('num_children') or 0)
         employment_status = request.form.get('employment_status', 'Employed')
         german_level = request.form.get('german_level', 'A1')
         
@@ -536,21 +599,8 @@ def demo_dashboard():
         
         if pipeline:
             for task_status in pipeline.task_statuses:
-                task_data = {
-                    'id': task_status.id,
-                    'title': task_status.action_step.title,
-                    'description': task_status.action_step.description,
-                    'category': task_status.action_step.category,
-                    'priority': task_status.action_step.priority,
-                    'estimated_time': task_status.action_step.estimated_time,
-                    'deadline': task_status.deadline,
-                    'completed': task_status.completed,
-                    'notes': task_status.notes,
-                    'url': task_status.action_step.url,
-                    'address': task_status.action_step.address,
-                    'required_documents': task_status.action_step.required_documents
-                }
-                
+                task_data = build_task_data(task_status, task_status.action_step)
+
                 if task_status.completed:
                     completed_tasks.append(task_data)
                 else:
@@ -595,9 +645,10 @@ def demo_update_task(task_id):
             task_status.completion_date = datetime.utcnow()
         else:
             task_status.completion_date = None
-        
+
         db.session.commit()
-        
+        calculate_progress(task_status.pipeline_id)
+
         action = "completed" if completed else "reopened"
         flash(f'Task "{task_status.action_step.title}" {action} successfully!', 'success')
         

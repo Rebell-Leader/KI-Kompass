@@ -14,6 +14,9 @@ class Base(DeclarativeBase):
 # Initialize Flask app
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET")
+if not app.secret_key:
+    logging.warning("SESSION_SECRET not set - using an insecure development key")
+    app.secret_key = "dev-secret-key-change-in-production"
 app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1) # needed for url_for to generate with https
 
 # Session configuration for OAuth - critical for state persistence
@@ -26,7 +29,14 @@ app.config['SESSION_COOKIE_DOMAIN'] = None  # Allow for subdomain flexibility
 app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 hours
 
 # Database configuration
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
+database_url = os.environ.get("DATABASE_URL")
+if database_url and database_url.startswith("postgres://"):
+    # SQLAlchemy no longer accepts the legacy postgres:// scheme
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
+if not database_url:
+    logging.warning("DATABASE_URL not set - falling back to local SQLite database")
+    database_url = "sqlite:///ki_kompass.db"
+app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     'pool_pre_ping': True,
@@ -44,7 +54,13 @@ login_manager.init_app(app)
 replit_bp = make_replit_blueprint()
 app.register_blueprint(replit_bp, url_prefix="/auth")
 
-# Database tables will be created on first request in routes.py
-
 # Import routes after app and database are initialized
 import routes  # noqa: F401
+
+# Create tables and seed data at startup so every entry point
+# (demo mode, API, dashboard) finds an initialized database
+with app.app_context():
+    try:
+        routes.ensure_database_initialized()
+    except Exception as e:
+        logging.warning(f"Database initialization deferred (will retry on first request): {e}")

@@ -96,6 +96,12 @@ def get_llm():
     logger.error("No LLM provider available - both Featherless and OpenAI initialization failed")
     raise ValueError("Could not initialize any LLM provider. Please check your API keys and connections.")
 
+# Cached instances - building the vector store (and downloading the embedding
+# model) is far too slow to repeat on every chat request
+_vectorstore = None
+_conversation_chain = None
+_basic_chain = None
+
 # Get knowledge base for relocation to Munich
 def get_knowledge_base():
     """
@@ -104,6 +110,10 @@ def get_knowledge_base():
     Attempts to fetch real-time data from Munich government services,
     with fallback to curated knowledge base if scraping fails.
     """
+    global _vectorstore
+    if _vectorstore is not None:
+        return _vectorstore
+
     embeddings = get_embeddings()
     texts = []
     
@@ -145,41 +155,50 @@ def get_knowledge_base():
     
     # Create vector store with available knowledge
     try:
-        return Qdrant.from_texts(
+        _vectorstore = Qdrant.from_texts(
             texts=texts,
             embedding=embeddings,
             location=":memory:",
             collection_name="munich_relocation_kb"
         )
+        return _vectorstore
     except Exception as e:
         logger.error(f"Failed to create vector store: {str(e)}")
         raise e
 
 # Create a conversational chain with retrieval
 def get_conversation_chain():
+    global _conversation_chain
+    if _conversation_chain is not None:
+        return _conversation_chain
+
     llm = get_llm()
     vectorstore = get_knowledge_base()
     memory = ConversationBufferMemory(
         memory_key="chat_history",
         return_messages=True
     )
-    
+
     retriever = vectorstore.as_retriever(
         search_type="similarity",
         search_kwargs={"k": 3}
     )
-    
-    chain = ConversationalRetrievalChain.from_llm(
+
+    _conversation_chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=retriever,
         memory=memory,
         verbose=True
     )
-    
-    return chain
+
+    return _conversation_chain
 
 # For basic responses without knowledge retrieval
 def get_basic_chain():
+    global _basic_chain
+    if _basic_chain is not None:
+        return _basic_chain
+
     llm = get_llm()
     
     template = """
@@ -199,11 +218,11 @@ def get_basic_chain():
         template=template
     )
     
-    chain = LLMChain(
-        llm=llm, 
-        prompt=prompt, 
+    _basic_chain = LLMChain(
+        llm=llm,
+        prompt=prompt,
         verbose=True,
         output_key="text"  # Fix the output key to match what ai_assistant.py expects
     )
-    
-    return chain
+
+    return _basic_chain

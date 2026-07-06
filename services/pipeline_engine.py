@@ -55,19 +55,24 @@ def select_steps_for_user(user):
     logger = logging.getLogger(__name__)
     logger.debug(f"Selecting steps for user with visa_type: {user.visa_type}")
     
-    # Map specific visa types to general categories
+    # Map specific visa types to general categories (keys are lowercase; user
+    # input is normalized below so form values like "EU_Citizen" match too)
     visa_type_mapping = {
         # EU visa types
         "eu_citizen": "eu",
         "eu_family": "eu",
         # Work-related visa types
-        "blue_card": "work",
+        "work": "work",
+        "work_visa": "work",
         "work_permit": "work",
+        "blue_card": "work",
         "freelancer": "work",
         "entrepreneur": "work",
         "job_seeker": "job seeker",
         # Study-related visa types
+        "study": "study",
         "student": "study",
+        "student_visa": "study",
         "language_course": "study",
         "research": "study",
         # Family-related visa types
@@ -79,9 +84,10 @@ def select_steps_for_user(user):
         "refugee": "humanitarian",
         "asylum": "humanitarian"
     }
-    
-    # Get the generalized visa type
-    general_visa_type = visa_type_mapping.get(user.visa_type)
+
+    # Normalize and generalize the user's visa type
+    user_visa_type = (user.visa_type or "").strip().lower()
+    general_visa_type = visa_type_mapping.get(user_visa_type)
     logger.debug(f"Mapped visa type: {general_visa_type}")
     
     # Get all steps from database
@@ -92,18 +98,18 @@ def select_steps_for_user(user):
     visa_filtered_steps = []
     
     for step in all_steps:
-        step_visa_types = step.visa_types or []
-        
+        step_visa_types = [v.lower() for v in (step.visa_types or [])]
+
         # If the visa types list is empty or contains "all", include for everyone
         if not step_visa_types or "all" in step_visa_types:
             visa_filtered_steps.append(step)
             continue
-            
+
         # Check if user's specific visa type is in the list
-        if user.visa_type in step_visa_types:
+        if user_visa_type and user_visa_type in step_visa_types:
             visa_filtered_steps.append(step)
             continue
-            
+
         # Check if the general category is in the list
         if general_visa_type and general_visa_type in step_visa_types:
             visa_filtered_steps.append(step)
@@ -124,7 +130,8 @@ def select_steps_for_user(user):
             continue  # Skip steps that require family when user doesn't have family
         
         # Employment requirements
-        employed = user.employment_status in ['employed', 'self-employed']
+        employment_status = (user.employment_status or "").strip().lower()
+        employed = employment_status in ['employed', 'self-employed', 'self_employed']
         if step.employment_required and not employed:
             continue  # Skip steps that require employment when user isn't employed
         
