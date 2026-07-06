@@ -164,15 +164,21 @@ def chat():
     return render_template('chat.html', user=user)
 
 @app.route('/api/chat', methods=['POST'])
-@require_login
 def api_chat():
-    """API endpoint for chat messages"""
+    """API endpoint for chat messages (logged-in users and demo sessions)"""
     try:
-        user = current_user
-        data = request.json
-        message = data.get('message', '').strip()
-        conversation_id = data.get('conversation_id', 'default')
-        
+        owner_id = _current_task_owner_id()
+        if not owner_id:
+            return jsonify({"error": "Not authenticated"}), 401
+
+        user = db.session.get(User, owner_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        data = request.get_json(silent=True) or {}
+        message = (data.get('message') or '').strip()
+        conversation_id = data.get('conversation_id') or 'default'
+
         if not message:
             return jsonify({"error": "Message cannot be empty"}), 400
         
@@ -295,6 +301,108 @@ def api_task_update():
     except Exception as e:
         logger.error(f"Update task error: {str(e)}")
         return jsonify({"error": "Failed to update task"}), 500
+
+@app.route('/api/tasks/optional', methods=['GET'])
+def api_get_optional_tasks():
+    """Action steps not in the current user's pipeline, available to add manually"""
+    try:
+        owner_id = _current_task_owner_id()
+        if not owner_id:
+            return jsonify({"error": "Not authenticated"}), 401
+
+        pipeline = IntegrationPipeline.query.filter_by(user_id=owner_id).first()
+        if not pipeline:
+            return jsonify({"error": "No pipeline found"}), 404
+
+        existing_step_ids = {ts.action_step_id for ts in pipeline.task_statuses}
+        optional_steps = [s for s in ActionStep.query.all() if s.id not in existing_step_ids]
+
+        return jsonify({
+            "success": True,
+            "tasks": [{
+                "id": step.id,
+                "title": step.title,
+                "description": step.description,
+                "category": step.category,
+                "priority": step.priority,
+                "estimated_time": step.estimated_time
+            } for step in optional_steps]
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting optional tasks: {str(e)}")
+        return jsonify({"error": "Failed to load optional tasks"}), 500
+
+@app.route('/api/tasks/add', methods=['POST'])
+def api_add_task():
+    """Add an optional action step to the current user's pipeline"""
+    try:
+        owner_id = _current_task_owner_id()
+        if not owner_id:
+            return jsonify({"error": "Not authenticated"}), 401
+
+        data = request.get_json(silent=True) or {}
+        try:
+            action_step_id = int(data.get('task_id'))
+        except (TypeError, ValueError):
+            return jsonify({"error": "task_id is required"}), 400
+
+        pipeline = IntegrationPipeline.query.filter_by(user_id=owner_id).first()
+        if not pipeline:
+            return jsonify({"error": "No pipeline found"}), 404
+
+        action_step = db.session.get(ActionStep, action_step_id)
+        if not action_step:
+            return jsonify({"error": "Task not found"}), 404
+
+        # Idempotent: adding a step that is already in the pipeline is a no-op
+        existing = TaskStatus.query.filter_by(
+            pipeline_id=pipeline.id, action_step_id=action_step_id
+        ).first()
+        if not existing:
+            user = db.session.get(User, owner_id)
+            arrival_date = (user.arrival_date if user and user.arrival_date else datetime.utcnow())
+            deadline = arrival_date + timedelta(days=action_step.timeline_offset) if action_step.timeline_offset else None
+            db.session.add(TaskStatus(
+                pipeline_id=pipeline.id,
+                action_step_id=action_step_id,
+                completed=False,
+                deadline=deadline
+            ))
+            db.session.commit()
+            calculate_progress(pipeline.id)
+
+        return jsonify({"success": True, "message": "Task added to your pipeline"})
+
+    except Exception as e:
+        logger.error(f"Error adding task: {str(e)}")
+        return jsonify({"error": "Failed to add task"}), 500
+
+@app.route('/api/pipeline/regenerate', methods=['POST'])
+def api_regenerate_pipeline():
+    """Delete the current user's pipeline and rebuild it from their profile"""
+    try:
+        owner_id = _current_task_owner_id()
+        if not owner_id:
+            return jsonify({"error": "Not authenticated"}), 401
+
+        pipeline = IntegrationPipeline.query.filter_by(user_id=owner_id).first()
+        if pipeline:
+            db.session.delete(pipeline)  # cascade removes its task statuses
+            db.session.commit()
+
+        new_pipeline = generate_pipeline(owner_id)
+
+        return jsonify({
+            "success": True,
+            "pipeline_id": new_pipeline.id,
+            "message": "Pipeline regenerated successfully"
+        })
+
+    except Exception as e:
+        logger.error(f"Error regenerating pipeline: {str(e)}")
+        db.session.rollback()
+        return jsonify({"error": "Failed to regenerate pipeline"}), 500
 
 @app.route('/api/tasks/<int:task_id>/update', methods=['POST'])
 @require_login

@@ -34,6 +34,18 @@ def get_ai_response(query, user, conversation_id=None):
         return "AI assistant is currently unavailable. Please set up either Featherless AI or OpenAI API key.", conversation_id
     
     try:
+        # Fetch conversation history BEFORE saving the new message, then build
+        # (user, assistant) pairs for the retrieval chain's chat_history input
+        prev_messages = ChatMessage.get_conversation(user.id, conversation_id)
+        chat_history = []
+        last_user_content = None
+        for m in prev_messages:
+            if m.role == 'user':
+                last_user_content = m.content
+            elif m.role == 'assistant' and last_user_content is not None:
+                chat_history.append((last_user_content, m.content))
+                last_user_content = None
+
         # Save the user message to the database
         user_message = ChatMessage(
             user_id=user.id,
@@ -43,7 +55,7 @@ def get_ai_response(query, user, conversation_id=None):
         )
         db.session.add(user_message)
         db.session.commit()
-        
+
         # Prepare user profile context - handling potential None values
         user_profile = {
             "nationality": user.nationality or "Not specified",
@@ -57,15 +69,12 @@ def get_ai_response(query, user, conversation_id=None):
         relocation_keywords = ['munich', 'germany', 'visa', 'registration', 'anmeldung', 'residence', 'permit', 'housing', 'apartment', 'bank', 'insurance', 'tax', 'bureaucracy']
         is_relocation_query = any(keyword in query.lower() for keyword in relocation_keywords)
         
-        # Get previous conversation history for context
-        prev_messages = ChatMessage.get_conversation(user.id, conversation_id)
-        conversation_summary = ChatMessage.get_conversation_summary(user.id, conversation_id)
-        
         logger.info(f"Processing query: '{query}' (relocation-specific: {is_relocation_query}, conversation: {conversation_id})")
-        
-        # Include some conversation context in the query if available
+
+        # For the basic chain (no chat_history input), summarize prior topics inline
         context_prompt = ""
-        if len(prev_messages) > 1:  # Skip if this is the first message
+        if chat_history:
+            conversation_summary = ChatMessage.get_conversation_summary(user.id, conversation_id)
             context_prompt = f"Based on our conversation about {conversation_summary}, "
         
         # Attempt with robust error handling
@@ -85,9 +94,10 @@ def get_ai_response(query, user, conversation_id=None):
 
                 # Only use LLM for more complex queries
                 if is_relocation_query:
-                    # Use conversational retrieval chain for relocation-specific queries
+                    # Use conversational retrieval chain for relocation-specific queries,
+                    # passing this conversation's history from the database
                     chain = get_conversation_chain()
-                    response = chain.invoke({"question": context_prompt + query})
+                    response = chain.invoke({"question": query, "chat_history": chat_history})
                     ai_response = response.get("answer", "I don't have specific information about that aspect of relocation.")
                 else:
                     # Use basic chain for general queries

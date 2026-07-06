@@ -2,7 +2,6 @@ import os
 import logging
 from langchain.chains import LLMChain, ConversationalRetrievalChain
 from langchain.prompts import PromptTemplate
-from langchain.memory import ConversationBufferMemory
 from langchain_community.vectorstores import Qdrant
 
 try:
@@ -168,16 +167,15 @@ def get_knowledge_base():
 
 # Create a conversational chain with retrieval
 def get_conversation_chain():
+    """Retrieval chain without attached memory - the caller passes chat_history
+    per invoke, built from the conversation stored in the database. A shared
+    in-process memory would leak context between users."""
     global _conversation_chain
     if _conversation_chain is not None:
         return _conversation_chain
 
     llm = get_llm()
     vectorstore = get_knowledge_base()
-    memory = ConversationBufferMemory(
-        memory_key="chat_history",
-        return_messages=True
-    )
 
     retriever = vectorstore.as_retriever(
         search_type="similarity",
@@ -187,7 +185,6 @@ def get_conversation_chain():
     _conversation_chain = ConversationalRetrievalChain.from_llm(
         llm=llm,
         retriever=retriever,
-        memory=memory,
         verbose=True
     )
 
