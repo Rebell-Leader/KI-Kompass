@@ -60,8 +60,25 @@ def build_task_data(task_status, action_step):
         'address': action_step.address,
         'required_documents': action_step.required_documents,
         'source_url': action_step.source_url,
-        'last_verified': action_step.last_verified
+        'last_verified': action_step.last_verified,
+        'booking_url': action_step.booking_url,
+        'prerequisites': action_step.prerequisites or [],
+        'blocked_by': []
     }
+
+def annotate_blocked_tasks(tasks):
+    """Mark tasks whose prerequisites (by step title) are in this pipeline
+    but not yet completed. Prerequisites that were never selected for this
+    user's pipeline don't block anything."""
+    titles_in_pipeline = {t['title'] for t in tasks}
+    completed_titles = {t['title'] for t in tasks if t['completed']}
+
+    for task in tasks:
+        task['blocked_by'] = [
+            p for p in task['prerequisites']
+            if p in titles_in_pipeline and p not in completed_titles
+        ]
+    return tasks
 
 # Make session permanent and ensure OAuth state persistence
 @app.before_request
@@ -109,11 +126,12 @@ def dashboard():
     ).filter(TaskStatus.pipeline_id == pipeline.id).all()
 
     tasks = [build_task_data(task_status, action_step) for task_status, action_step in task_rows]
+    annotate_blocked_tasks(tasks)
 
-    # Separate completed and upcoming tasks
+    # Separate completed and upcoming tasks; actionable (unblocked) tasks first
     completed_tasks = [task for task in tasks if task['completed']]
     upcoming_tasks = [task for task in tasks if not task['completed']]
-    upcoming_tasks.sort(key=lambda x: (x['priority'], x['deadline'] or datetime.max))
+    upcoming_tasks.sort(key=lambda x: (bool(x['blocked_by']), x['priority'], x['deadline'] or datetime.max))
 
     return render_template('dashboard.html',
                          user=user,
@@ -781,16 +799,13 @@ def demo_dashboard():
         completed_tasks = []
         
         if pipeline:
-            for task_status in pipeline.task_statuses:
-                task_data = build_task_data(task_status, task_status.action_step)
+            all_tasks = [build_task_data(ts, ts.action_step) for ts in pipeline.task_statuses]
+            annotate_blocked_tasks(all_tasks)
+            completed_tasks = [t for t in all_tasks if t['completed']]
+            upcoming_tasks = [t for t in all_tasks if not t['completed']]
 
-                if task_status.completed:
-                    completed_tasks.append(task_data)
-                else:
-                    upcoming_tasks.append(task_data)
-        
-        # Sort upcoming tasks by priority and deadline
-        upcoming_tasks.sort(key=lambda x: (x['priority'], x['deadline'] or datetime.max))
+        # Sort upcoming tasks: actionable first, then by priority and deadline
+        upcoming_tasks.sort(key=lambda x: (bool(x['blocked_by']), x['priority'], x['deadline'] or datetime.max))
         
         return render_template('demo_dashboard.html',
                              demo_mode=True,

@@ -115,6 +115,15 @@ date is bumped when its source is fetched successfully. Schedule this command
 (e.g. daily via cron or a scheduled deployment) to keep the data current.
 When the table is empty, a curated built-in knowledge base is used as fallback.
 
+# Email Reminders
+
+Run `flask send-reminders` (schedule daily) to email every real onboarded user
+a digest of their overdue tasks and tasks due within 7 days. Configure SMTP via
+environment variables - any provider's SMTP endpoint works:
+`SMTP_HOST`, `SMTP_PORT` (default 587), `SMTP_USERNAME`, `SMTP_PASSWORD`,
+`SMTP_STARTTLS` (default true), `MAIL_FROM`. When unconfigured, the command
+reports it and sends nothing.
+
 # Changelog
 
 Changelog:

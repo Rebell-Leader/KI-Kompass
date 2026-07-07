@@ -182,10 +182,22 @@
                                                 {{ task.deadline.strftime('%b %d') }}
                                             </span>
                                             {% endif %}
+                                            {% if task.blocked_by %}
+                                            <span class="badge bg-warning text-dark" title="Complete the prerequisite task(s) first">
+                                                <i data-feather="lock" width="12" height="12" class="me-1"></i>
+                                                Waiting for: {{ task.blocked_by|join(', ') }}
+                                            </span>
+                                            {% endif %}
                                         </div>
 
-                                        {% if task.url or task.address %}
+                                        {% if task.booking_url or task.url or task.address %}
                                         <div class="task-links mt-2">
+                                            {% if task.booking_url %}
+                                            <a href="{{ task.booking_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary me-2">
+                                                <i data-feather="calendar" width="12" height="12" class="me-1"></i>
+                                                Book Appointment
+                                            </a>
+                                            {% endif %}
                                             {% if task.url %}
                                             <a href="{{ task.url }}" target="_blank" class="btn btn-sm btn-outline-primary me-2">
                                                 <i data-feather="external-link" width="12" height="12" class="me-1"></i>

@@ -74,6 +74,18 @@ app.register_blueprint(replit_bp, url_prefix="/auth")
 # Import routes after app and database are initialized
 import routes  # noqa: F401
 
+@app.cli.command("send-reminders")
+def send_reminders_command():
+    """Email each user a digest of overdue and upcoming relocation tasks.
+    Requires SMTP_HOST and MAIL_FROM; schedule daily to deliver reminders."""
+    from services.reminders import send_deadline_reminders
+    summary = send_deadline_reminders()
+    if not summary["configured"]:
+        print("Email is not configured - set SMTP_HOST and MAIL_FROM (see services/email_service.py)")
+    else:
+        print(f"Reminders: {summary['sent']} sent, {summary['skipped_no_tasks']} users had nothing due, "
+              f"{summary['failed']} failed (of {summary['eligible']} eligible users)")
+
 @app.cli.command("refresh-knowledge")
 def refresh_knowledge_command():
     """Fetch official source pages into the AI knowledge base and bump

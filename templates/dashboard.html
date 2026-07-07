@@ -185,6 +185,12 @@
                                             {% else %}
                                                 <span class="badge badge-info">Low Priority</span>
                                             {% endif %}
+                                            {% if task.blocked_by %}
+                                                <span class="badge badge-warning" title="Complete the prerequisite task(s) first">Waiting for: {{ task.blocked_by|join(', ') }}</span>
+                                            {% endif %}
+                                            {% if task.booking_url %}
+                                                <a href="{{ task.booking_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary ms-2">Book Appointment</a>
+                                            {% endif %}
                                         </div>
                                         <div class="step-actions">
                                             <div class="form-check">

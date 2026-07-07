@@ -89,6 +89,9 @@ class ActionStep(db.Model):
     # was last checked against that source (updated by 'flask refresh-knowledge')
     source_url = Column(String(256))
     last_verified = Column(DateTime)
+    # Direct link to the official online appointment booking (Terminvereinbarung)
+    # for steps that require one
+    booking_url = Column(String(256))
 
     # Relationships
     task_statuses = relationship("TaskStatus", back_populates="action_step")

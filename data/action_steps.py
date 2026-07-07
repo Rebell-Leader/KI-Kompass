@@ -5,6 +5,16 @@ from datetime import datetime
 # fresher last_verified automatically when 'flask refresh-knowledge' succeeds.
 DATA_CURATED_AT = datetime(2025, 6, 29)
 
+# Official online appointment booking (Terminvereinbarung) links for steps
+# that require an appointment in Munich. Keyed by step title so existing
+# databases can be backfilled too.
+BOOKING_URLS = {
+    # Buergerbuero appointments (Anmeldung and most citizen services)
+    "Address Registration (Anmeldung)": "https://stadt.muenchen.de/buergerservice/terminvereinbarung.html",
+    # Auslaenderbehoerde (foreigners office) appointment portal
+    "Apply for Residence Permit": "https://terminvereinbarung.muenchen.de/abh/termin/",
+}
+
 
 def populate_action_steps(db):
     """
@@ -266,6 +276,7 @@ def populate_action_steps(db):
     for step_data in action_steps:
         step_data.setdefault("source_url", step_data.get("url") or None)
         step_data.setdefault("last_verified", DATA_CURATED_AT)
+        step_data.setdefault("booking_url", BOOKING_URLS.get(step_data["title"]))
 
         # Check if step already exists
         existing_step = ActionStep.query.filter_by(title=step_data["title"]).first()
@@ -287,6 +298,12 @@ def backfill_provenance(db):
         if step.last_verified is None:
             step.last_verified = DATA_CURATED_AT
         updated += 1
+
+    for title, booking_url in BOOKING_URLS.items():
+        step = ActionStep.query.filter_by(title=title).first()
+        if step and not step.booking_url:
+            step.booking_url = booking_url
+            updated += 1
 
     if updated:
         db.session.commit()
