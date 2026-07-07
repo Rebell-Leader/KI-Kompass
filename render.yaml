@@ -16,7 +16,9 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install uv && uv python install 3.11 && uv sync --frozen
-    startCommand: uv run flask db upgrade && uv run gunicorn --bind 0.0.0.0:$PORT --workers 2 main:app
+    # FLASK_SKIP_DB_CREATE keeps the app's startup bootstrap from running
+    # create_all during the migration step (Alembic owns the schema here)
+    startCommand: FLASK_SKIP_DB_CREATE=1 uv run flask db upgrade && uv run gunicorn --bind 0.0.0.0:$PORT --workers 2 main:app
     healthCheckPath: /
     envVars:
       - key: PYTHON_VERSION
