@@ -2,7 +2,10 @@
 name = "ki-kompass"
 version = "0.2.0"
 description = "Munich relocation and integration assistant"
-requires-python = ">=3.11"
+# Upper bound matters for deployment: uv otherwise selects the newest Python
+# it can install, and locked packages may not have prebuilt wheels for a
+# brand-new interpreter (source builds fail on read-only hosts like Render)
+requires-python = ">=3.11,<3.14"
 dependencies = [
     "flask>=3.1.0",
     "flask-sqlalchemy>=3.1.1",

@@ -15,7 +15,7 @@ services:
     name: ki-kompass
     runtime: python
     plan: free
-    buildCommand: pip install uv && uv sync --frozen
+    buildCommand: pip install uv && uv python install 3.11 && uv sync --frozen
     startCommand: uv run flask db upgrade && uv run gunicorn --bind 0.0.0.0:$PORT --workers 2 main:app
     healthCheckPath: /
     envVars:
