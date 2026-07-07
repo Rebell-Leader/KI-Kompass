@@ -96,79 +96,122 @@ def get_llm():
     raise ValueError("Could not initialize any LLM provider. Please check your API keys and connections.")
 
 # Cached instances - building the vector store (and downloading the embedding
-# model) is far too slow to repeat on every chat request
+# model) is far too slow to repeat on every chat request. The vector store is
+# additionally versioned against the knowledge_documents table so a refresh
+# ('flask refresh-knowledge') is picked up without restarting the app.
+_embeddings = None
 _vectorstore = None
+_vectorstore_version = None
 _answer_chain = None
+
+def get_cached_embeddings():
+    global _embeddings
+    if _embeddings is None:
+        _embeddings = get_embeddings()
+    return _embeddings
+
+# Curated fallback knowledge, used until 'flask refresh-knowledge' has stored
+# live content from the official sources. Each entry carries the official URL
+# it was derived from so answers can cite it.
+CURATED_KNOWLEDGE = [
+    {
+        "text": "When you move to Munich, you must register your address at the local Bürgerbüro (citizen's office) within 14 days of arrival. This process is called 'Anmeldung'. You'll need your passport and a confirmation from your landlord (Wohnungsgeberbestätigung).",
+        "source": "https://www.muenchen.de/rathaus/home_en/Department-of-Public-Order/Residence-Registration"
+    },
+    {
+        "text": "After registering your address, you'll receive your tax identification number (Steuer-ID) by mail within 2-4 weeks. You'll need this for employment in Germany.",
+        "source": "https://www.finanzamt.bayern.de/"
+    },
+    {
+        "text": "Non-EU citizens must apply for a residence permit at the Foreign Office (Ausländerbehörde) within 90 days of arrival or before their visa expires. Required documents typically include passport, biometric photos, proof of address, proof of health insurance, and proof of financial means.",
+        "source": "https://www.muenchen.de/rathaus/home_en/Department-of-Public-Order/Foreigners-Office"
+    },
+    {
+        "text": "Health insurance is mandatory in Germany. Public health insurance (gesetzliche Krankenversicherung) is provided by various companies like TK, AOK, or Barmer. If you're employed, your employer will register you and split the cost. Self-employed individuals can choose between public and private insurance.",
+        "source": "https://www.krankenkassen.de/gesetzliche-krankenkassen/krankenkassen-liste/"
+    },
+    {
+        "text": "Opening a bank account (Girokonto) is essential for rent payments, receiving salary, and daily transactions. Popular options include Deutsche Bank, Commerzbank, and online banks like N26 or DKB. You'll need your passport and registration certificate (Anmeldebestätigung).",
+        "source": None
+    },
+    {
+        "text": "Munich has an excellent public transportation system operated by MVV, including U-Bahn (subway), S-Bahn (suburban trains), trams, and buses. Monthly passes (IsarCard) offer significant savings compared to individual tickets.",
+        "source": "https://www.mvg.de/tickets-tarife/abonnement.html"
+    },
+    {
+        "text": "Learning German is crucial for integration. The Volkshochschule München (VHS) offers affordable language courses at all levels. Goethe-Institut provides more intensive but costlier options. Online platforms like Duolingo or Babbel can supplement formal learning.",
+        "source": "https://www.mvhs.de/programm/deutsch-als-fremdsprache"
+    },
+    {
+        "text": "Finding accommodation in Munich is challenging due to high demand. Websites like ImmobilienScout24, WG-Gesucht, and Mr. Lodge are popular for apartment hunting. Expect to pay a deposit (Kaution) of 2-3 months' rent and possibly a commission fee (Provision) if using an agent.",
+        "source": "https://www.muenchen.de/int/en/living/finding-accommodation"
+    },
+    {
+        "text": "For non-EU citizens, integration courses (Integrationskurs) are often mandatory. These include language lessons and orientation modules about German culture, history, and legal system. The Federal Office for Migration and Refugees (BAMF) subsidizes these courses.",
+        "source": "https://www.bamf.de/EN/Themen/Integration/ZugewanderteTeilnehmende/Integrationskurse/integrationskurse-node.html"
+    },
+]
+
+def _load_knowledge_entries():
+    """Load knowledge from the database (refreshed official pages) with a
+    curated fallback, plus a version key for cache invalidation."""
+    try:
+        from models import KnowledgeDocument
+        docs = KnowledgeDocument.query.all()
+        if docs:
+            entries = [{"text": d.content, "source": d.source_url} for d in docs]
+            version = ("db", len(docs), str(max(d.fetched_at for d in docs if d.fetched_at)))
+            logger.info(f"Using {len(docs)} refreshed official documents as knowledge base")
+            return entries, version
+    except Exception as e:
+        logger.warning(f"Could not load knowledge documents from database: {str(e)}")
+
+    logger.info("Using curated fallback knowledge base")
+    return CURATED_KNOWLEDGE, ("curated", len(CURATED_KNOWLEDGE))
 
 # Get knowledge base for relocation to Munich
 def get_knowledge_base():
-    """
-    Creates or loads a Qdrant vector store for relocation knowledge.
-    
-    Attempts to fetch real-time data from Munich government services,
-    with fallback to curated knowledge base if scraping fails.
-    """
-    global _vectorstore
-    if _vectorstore is not None:
+    """Create or return the Qdrant vector store for relocation knowledge,
+    rebuilding it when the underlying knowledge documents change."""
+    global _vectorstore, _vectorstore_version
+
+    entries, version = _load_knowledge_entries()
+    if _vectorstore is not None and _vectorstore_version == version:
         return _vectorstore
 
-    embeddings = get_embeddings()
-    texts = []
-    
-    # Note: Web scraping functionality disabled for MVP
-    # Will be implemented in future versions
-    logger.info("Using curated knowledge base (web scraping not yet implemented)")
-    
-    # If no live data or scraping failed, use curated fallback knowledge
-    if not texts:
-        logger.info("Using curated fallback knowledge base")
-        texts = [
-            # Anmeldung (Registration)
-            "When you move to Munich, you must register your address at the local Bürgerbüro (citizen's office) within 14 days of arrival. This process is called 'Anmeldung'. You'll need your passport and a confirmation from your landlord (Wohnungsgeberbestätigung).",
-            
-            # Tax ID
-            "After registering your address, you'll receive your tax identification number (Steuer-ID) by mail within 2-4 weeks. You'll need this for employment in Germany.",
-            
-            # Residence Permit
-            "Non-EU citizens must apply for a residence permit at the Foreign Office (Ausländerbehörde) within 90 days of arrival or before their visa expires. Required documents typically include passport, biometric photos, proof of address, proof of health insurance, and proof of financial means.",
-            
-            # Health Insurance
-            "Health insurance is mandatory in Germany. Public health insurance (gesetzliche Krankenversicherung) is provided by various companies like TK, AOK, or Barmer. If you're employed, your employer will register you and split the cost. Self-employed individuals can choose between public and private insurance.",
-            
-            # Bank Account
-            "Opening a bank account (Girokonto) is essential for rent payments, receiving salary, and daily transactions. Popular options include Deutsche Bank, Commerzbank, and online banks like N26 or DKB. You'll need your passport and registration certificate (Anmeldebestätigung).",
-            
-            # Transportation
-            "Munich has an excellent public transportation system operated by MVV, including U-Bahn (subway), S-Bahn (suburban trains), trams, and buses. Monthly passes (IsarCard) offer significant savings compared to individual tickets.",
-            
-            # German Courses
-            "Learning German is crucial for integration. The Volkshochschule München (VHS) offers affordable language courses at all levels. Goethe-Institut provides more intensive but costlier options. Online platforms like Duolingo or Babbel can supplement formal learning.",
-            
-            # Housing
-            "Finding accommodation in Munich is challenging due to high demand. Websites like ImmobilienScout24, WG-Gesucht, and Mr. Lodge are popular for apartment hunting. Expect to pay a deposit (Kaution) of 2-3 months' rent and possibly a commission fee (Provision) if using an agent.",
-            
-            # Integration Course
-            "For non-EU citizens, integration courses (Integrationskurs) are often mandatory. These include language lessons and orientation modules about German culture, history, and legal system. The Federal Office for Migration and Refugees (BAMF) subsidizes these courses."
-        ]
-    
-    # Create vector store with available knowledge
+    embeddings = get_cached_embeddings()
+
     try:
         _vectorstore = Qdrant.from_texts(
-            texts=texts,
+            texts=[e["text"] for e in entries],
             embedding=embeddings,
+            metadatas=[{"source": e["source"]} for e in entries],
             location=":memory:",
             collection_name="munich_relocation_kb"
         )
+        _vectorstore_version = version
         return _vectorstore
     except Exception as e:
         logger.error(f"Failed to create vector store: {str(e)}")
         raise e
 
 def retrieve_context(query, k=3):
-    """Retrieve the most relevant knowledge base passages for a query"""
+    """Retrieve the most relevant knowledge passages for a query.
+
+    Returns (context_text, source_urls) so answers can cite where the
+    information came from.
+    """
     vectorstore = get_knowledge_base()
     docs = vectorstore.similarity_search(query, k=k)
-    return "\n\n".join(doc.page_content for doc in docs)
+
+    context = "\n\n".join(doc.page_content for doc in docs)
+    sources = []
+    for doc in docs:
+        source = (doc.metadata or {}).get("source")
+        if source and source not in sources:
+            sources.append(source)
+
+    return context, sources
 
 # Single answer chain: guardrails + user profile + retrieved context + history.
 # The caller supplies chat_history from the database per invoke, so memory is

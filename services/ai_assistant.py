@@ -84,7 +84,7 @@ def get_ai_response(query, user, conversation_id=None):
 
                 # Retrieve relevant official knowledge and format recent history
                 # (last 5 exchanges keeps the prompt bounded)
-                context = retrieve_context(query)
+                context, sources = retrieve_context(query)
                 history_text = "\n".join(
                     f"User: {u}\nAssistant: {a}" for u, a in chat_history[-5:]
                 ) or "(no previous messages)"
@@ -97,6 +97,11 @@ def get_ai_response(query, user, conversation_id=None):
                     "question": query
                 })
                 ai_response = response.get("text", "I'm not sure how to answer that question.")
+
+                # Cite where the grounding information came from so users can
+                # verify current details on the official pages
+                if sources:
+                    ai_response += "\n\nSources:\n" + "\n".join(f"• {s}" for s in sources)
 
                 logger.info(f"LLM response generated in {time.time() - start_time:.2f}s")
             

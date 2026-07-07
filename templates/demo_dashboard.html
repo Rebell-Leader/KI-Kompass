@@ -204,10 +204,18 @@
                                         {% if task.required_documents %}
                                         <div class="mt-2">
                                             <small class="text-muted">
-                                                <strong>Required documents:</strong> 
+                                                <strong>Required documents:</strong>
                                                 {% for doc in task.required_documents %}
                                                     {{ doc }}{% if not loop.last %}, {% endif %}
                                                 {% endfor %}
+                                            </small>
+                                        </div>
+                                        {% endif %}
+
+                                        {% if task.source_url %}
+                                        <div class="mt-2">
+                                            <small class="text-muted">
+                                                <a href="{{ task.source_url }}" target="_blank" rel="noopener noreferrer">Official source</a>{% if task.last_verified %} · verified {{ task.last_verified.strftime('%d %b %Y') }}{% endif %}
                                             </small>
                                         </div>
                                         {% endif %}

@@ -74,6 +74,15 @@ app.register_blueprint(replit_bp, url_prefix="/auth")
 # Import routes after app and database are initialized
 import routes  # noqa: F401
 
+@app.cli.command("refresh-knowledge")
+def refresh_knowledge_command():
+    """Fetch official source pages into the AI knowledge base and bump
+    each action step's last_verified date. Schedule this to keep data fresh."""
+    from services.knowledge_refresh import refresh_knowledge_base
+    summary = refresh_knowledge_base()
+    print(f"Knowledge refresh: {summary['fetched']}/{summary['sources_total']} sources fetched "
+          f"({summary['failed']} failed), {summary['documents_stored']} documents stored")
+
 # Create tables and seed data at startup so every entry point
 # (demo mode, API, dashboard) finds an initialized database.
 # Set FLASK_SKIP_DB_CREATE=1 when running flask db migrate/upgrade so

@@ -24,9 +24,15 @@ def ensure_database_initialized():
         logging.info("Database tables created")
         
         # Populate action steps if they don't exist
+        from data.action_steps import populate_action_steps, backfill_provenance
         if ActionStep.query.count() == 0:
-            from data.action_steps import populate_action_steps
             populate_action_steps(db)
+
+        # Stamp source_url/last_verified on rows created before those columns existed
+        try:
+            backfill_provenance(db)
+        except Exception as e:
+            logging.warning(f"Could not backfill action step provenance: {str(e)}")
         
         # Create performance indexes
         try:
@@ -52,7 +58,9 @@ def build_task_data(task_status, action_step):
         'notes': task_status.notes,
         'url': action_step.url,
         'address': action_step.address,
-        'required_documents': action_step.required_documents
+        'required_documents': action_step.required_documents,
+        'source_url': action_step.source_url,
+        'last_verified': action_step.last_verified
     }
 
 # Make session permanent and ensure OAuth state persistence

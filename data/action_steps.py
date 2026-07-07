@@ -1,9 +1,17 @@
+from datetime import datetime
+
+# Date this curated dataset was last reviewed against the official sources.
+# Update it whenever the steps below are re-checked. Individual steps get a
+# fresher last_verified automatically when 'flask refresh-knowledge' succeeds.
+DATA_CURATED_AT = datetime(2025, 6, 29)
+
+
 def populate_action_steps(db):
     """
     Populate the database with predefined action steps for relocation to Munich.
     """
     from models import ActionStep
-    
+
     # Define action steps
     action_steps = [
         # Pre-arrival planning
@@ -253,12 +261,33 @@ def populate_action_steps(db):
         }
     ]
     
-    # Add steps to database
+    # Add steps to database, stamping data provenance: the step's url doubles
+    # as the information source until a dedicated source_url is curated
     for step_data in action_steps:
+        step_data.setdefault("source_url", step_data.get("url") or None)
+        step_data.setdefault("last_verified", DATA_CURATED_AT)
+
         # Check if step already exists
         existing_step = ActionStep.query.filter_by(title=step_data["title"]).first()
         if not existing_step:
             step = ActionStep(**step_data)
             db.session.add(step)
-    
+
     db.session.commit()
+
+
+def backfill_provenance(db):
+    """Stamp source_url/last_verified on rows created before those columns existed"""
+    from models import ActionStep
+
+    updated = 0
+    for step in ActionStep.query.filter(ActionStep.source_url.is_(None)).all():
+        if step.url:
+            step.source_url = step.url
+        if step.last_verified is None:
+            step.last_verified = DATA_CURATED_AT
+        updated += 1
+
+    if updated:
+        db.session.commit()
+    return updated

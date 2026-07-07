@@ -160,7 +160,15 @@
                                                 <a href="{{ task.url }}" target="_blank" rel="noopener noreferrer">{{ task.url }}</a>
                                             </div>
                                         {% endif %}
-                                        
+
+                                        {% if task.source_url %}
+                                            <div class="mb-3">
+                                                <small class="text-muted">
+                                                    <a href="{{ task.source_url }}" target="_blank" rel="noopener noreferrer">Official source</a>{% if task.last_verified %} · information verified {{ task.last_verified.strftime('%d %b %Y') }}{% endif %} — always confirm current hours, fees and documents there.
+                                                </small>
+                                            </div>
+                                        {% endif %}
+
                                         <div class="form-group mb-0">
                                             <label for="task-notes-{{ task.id }}" class="form-label">Your Notes:</label>
                                             <textarea id="task-notes-{{ task.id }}" class="form-control task-notes" data-task-id="{{ task.id }}" rows="2" placeholder="Add your notes here..."></textarea>
