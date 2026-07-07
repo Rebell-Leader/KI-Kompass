@@ -98,3 +98,47 @@ def test_knowledge_entries_prefer_database():
     entries, version = _load_knowledge_entries()
     assert version[0] == "db"
     assert entries[0]["source"] == "https://example.gov/anmeldung"
+
+
+def test_keyword_retrieval_ranks_relevant_passages():
+    """Without Qdrant configured, retrieval falls back to keyword ranking"""
+    from services.llm_engine import retrieve_context, qdrant_configured
+
+    assert qdrant_configured() is False
+
+    context, sources = retrieve_context("How do I register my address (Anmeldung)?", k=2)
+    assert "Anmeldung" in context
+    assert any("Residence-Registration" in s for s in sources)
+
+    context, _ = retrieve_context("health insurance options", k=2)
+    assert "insurance" in context.lower()
+
+
+def test_cloud_retrieval_used_when_configured(monkeypatch):
+    """With QDRANT_URL set, retrieval goes through the cloud path and
+    falls back to keywords when the cloud call fails."""
+    import services.llm_engine as llm_engine
+
+    monkeypatch.setenv("QDRANT_URL", "https://cluster.example:6333")
+    monkeypatch.setenv("QDRANT_API_KEY", "key")
+    assert llm_engine.qdrant_configured() is True
+
+    calls = {}
+
+    def fake_cloud_retrieve(query, entries, version, k):
+        calls["query"] = query
+        return [{"text": "cloud passage", "source": "https://cloud.example"}]
+
+    monkeypatch.setattr(llm_engine, "_cloud_retrieve", fake_cloud_retrieve)
+    context, sources = llm_engine.retrieve_context("anmeldung", k=1)
+    assert calls["query"] == "anmeldung"
+    assert context == "cloud passage"
+    assert sources == ["https://cloud.example"]
+
+    # Cloud failure degrades to the keyword fallback instead of erroring
+    def broken_cloud_retrieve(*args, **kwargs):
+        raise ConnectionError("cluster unreachable")
+
+    monkeypatch.setattr(llm_engine, "_cloud_retrieve", broken_cloud_retrieve)
+    context, _ = llm_engine.retrieve_context("anmeldung", k=1)
+    assert "Anmeldung" in context

@@ -5,16 +5,24 @@ provider fallback needs no agent framework. It uses:
 
 - the OpenAI SDK for chat completions - Featherless AI is the primary
   provider (OpenAI-compatible base_url), OpenAI the fallback
-- fastembed for local embeddings (no API key required)
-- qdrant-client for in-memory vector retrieval
+- Qdrant Cloud for vector retrieval WITH server-side embedding inference
+  (cloud_inference=True), so no local embedding model runs - important on
+  small hosts like Render's free tier where onnxruntime doesn't even build
+- a dependency-free keyword-overlap fallback for retrieval when Qdrant is
+  not configured (local development, tests) or unreachable
+
+Configure Qdrant Cloud (free tier) via:
+    QDRANT_URL      e.g. https://<cluster-id>.<region>.gcp.cloud.qdrant.io:6333
+    QDRANT_API_KEY  the cluster API key
 
 The knowledge base loads from the knowledge_documents table (populated by
 'flask refresh-knowledge' from official sources) and falls back to curated
-built-in knowledge. The vector index is cached and versioned against the
-table so a refresh is picked up without restarting the app.
+built-in knowledge. The Qdrant collection is re-synced whenever the
+knowledge version changes, so a refresh is picked up without restarts.
 """
 import os
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +31,9 @@ FEATHERLESS_BASE_URL = "https://api.featherless.ai/v1"
 FEATHERLESS_MODEL = "deepseek-ai/DeepSeek-V3-0324"
 OPENAI_MODEL = "gpt-4o-mini"
 
-EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # small, fast, local
+# Embedding runs server-side in Qdrant Cloud; this names the hosted model
+CLOUD_EMBEDDING_MODEL = "sentence-transformers/all-minilm-l6-v2"
+CLOUD_EMBEDDING_SIZE = 384
 COLLECTION_NAME = "munich_relocation_kb"
 
 SYSTEM_PROMPT = """You are KI Kompass, an AI assistant helping people relocate to and integrate in Munich, Germany.
@@ -35,13 +45,11 @@ Follow these rules strictly:
 - Tailor your answer to the user's profile where relevant (visa type, family situation, employment, German level).
 - Be friendly and concise: under 150 words."""
 
-# Cached singletons - the embedding model and vector index are far too slow
-# to rebuild on every chat request
+# Cached singletons
 _llm_client = None
 _llm_model = None
-_embedder = None
 _qdrant = None
-_kb_version = None
+_synced_kb_version = None
 
 # Curated fallback knowledge, used until 'flask refresh-knowledge' has stored
 # live content from the official sources. Each entry carries the official URL
@@ -111,15 +119,6 @@ def get_llm():
     return _llm_client, _llm_model
 
 
-def get_embedder():
-    global _embedder
-    if _embedder is None:
-        from fastembed import TextEmbedding
-        logger.info(f"Loading embedding model {EMBEDDING_MODEL}")
-        _embedder = TextEmbedding(model_name=EMBEDDING_MODEL)
-    return _embedder
-
-
 def _load_knowledge_entries():
     """Load knowledge from the database (refreshed official pages) with a
     curated fallback, plus a version key for cache invalidation."""
@@ -138,60 +137,111 @@ def _load_knowledge_entries():
     return CURATED_KNOWLEDGE, ("curated", len(CURATED_KNOWLEDGE))
 
 
-def get_knowledge_index():
-    """Create or return the in-memory Qdrant index over relocation knowledge,
-    rebuilding it when the underlying knowledge documents change."""
-    global _qdrant, _kb_version
+def qdrant_configured():
+    return bool(os.environ.get("QDRANT_URL") and os.environ.get("QDRANT_API_KEY"))
 
-    entries, version = _load_knowledge_entries()
-    if _qdrant is not None and _kb_version == version:
-        return _qdrant
 
-    from qdrant_client import QdrantClient
-    from qdrant_client.models import Distance, VectorParams, PointStruct
+def _get_qdrant_client():
+    """Qdrant Cloud client with server-side embedding inference"""
+    global _qdrant
+    if _qdrant is None:
+        from qdrant_client import QdrantClient
+        _qdrant = QdrantClient(
+            url=os.environ["QDRANT_URL"],
+            api_key=os.environ["QDRANT_API_KEY"],
+            cloud_inference=True,
+        )
+    return _qdrant
 
-    embedder = get_embedder()
-    vectors = list(embedder.embed([e["text"] for e in entries]))
 
-    client = QdrantClient(":memory:")
+def _sync_cloud_collection(client, entries, version):
+    """(Re)build the cloud collection when the knowledge version changes.
+
+    The corpus is small (tens of documents), so a full rebuild is cheap;
+    embeddings are computed by Qdrant Cloud, not locally.
+    """
+    global _synced_kb_version
+    if _synced_kb_version == version and client.collection_exists(COLLECTION_NAME):
+        return
+
+    from qdrant_client.models import Distance, VectorParams, PointStruct, Document
+
+    if client.collection_exists(COLLECTION_NAME):
+        client.delete_collection(COLLECTION_NAME)
     client.create_collection(
         collection_name=COLLECTION_NAME,
-        vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
+        vectors_config=VectorParams(size=CLOUD_EMBEDDING_SIZE, distance=Distance.COSINE),
     )
     client.upsert(
         collection_name=COLLECTION_NAME,
         points=[
-            PointStruct(id=i, vector=vector.tolist(),
-                        payload={"text": entry["text"], "source": entry["source"]})
-            for i, (entry, vector) in enumerate(zip(entries, vectors))
+            PointStruct(
+                id=i,
+                payload={"text": entry["text"], "source": entry["source"]},
+                vector=Document(text=entry["text"], model=CLOUD_EMBEDDING_MODEL),
+            )
+            for i, entry in enumerate(entries)
         ],
     )
 
-    _qdrant = client
-    _kb_version = version
-    return _qdrant
+    _synced_kb_version = version
+    logger.info(f"Synced {len(entries)} documents to Qdrant Cloud (version {version[0]})")
+
+
+def _cloud_retrieve(query, entries, version, k):
+    from qdrant_client.models import Document
+
+    client = _get_qdrant_client()
+    _sync_cloud_collection(client, entries, version)
+
+    hits = client.query_points(
+        collection_name=COLLECTION_NAME,
+        query=Document(text=query, model=CLOUD_EMBEDDING_MODEL),
+        limit=k,
+        with_payload=True,
+    ).points
+    return [hit.payload for hit in hits]
+
+
+_WORD_RE = re.compile(r"[a-zà-ÿäöüß]{3,}")
+
+
+def _keyword_retrieve(query, entries, k):
+    """Dependency-free fallback ranking by word overlap. Adequate for the
+    small curated corpus when Qdrant Cloud is not configured (dev, tests)."""
+    query_words = set(_WORD_RE.findall(query.lower()))
+
+    def score(entry):
+        return len(query_words & set(_WORD_RE.findall(entry["text"].lower())))
+
+    ranked = sorted(entries, key=score, reverse=True)
+    top = [e for e in ranked[:k] if score(e) > 0] or ranked[:k]
+    return top
 
 
 def retrieve_context(query, k=3):
     """Retrieve the most relevant knowledge passages for a query.
 
     Returns (context_text, source_urls) so answers can cite where the
-    information came from.
+    information came from. Uses Qdrant Cloud when configured, with a
+    keyword-overlap fallback otherwise (or when the cloud is unreachable).
     """
-    index = get_knowledge_index()
-    embedder = get_embedder()
-    query_vector = list(embedder.embed([query]))[0].tolist()
+    entries, version = _load_knowledge_entries()
 
-    hits = index.query_points(
-        collection_name=COLLECTION_NAME,
-        query=query_vector,
-        limit=k,
-    ).points
+    results = None
+    if qdrant_configured():
+        try:
+            results = _cloud_retrieve(query, entries, version, k)
+        except Exception as e:
+            logger.error(f"Qdrant Cloud retrieval failed, using keyword fallback: {str(e)}")
 
-    context = "\n\n".join(hit.payload["text"] for hit in hits)
+    if results is None:
+        results = _keyword_retrieve(query, entries, k)
+
+    context = "\n\n".join(r["text"] for r in results)
     sources = []
-    for hit in hits:
-        source = hit.payload.get("source")
+    for r in results:
+        source = r.get("source")
         if source and source not in sources:
             sources.append(source)
 

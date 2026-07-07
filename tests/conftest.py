@@ -19,6 +19,8 @@ os.environ.pop("FLASK_SKIP_DB_CREATE", None)
 os.environ.pop("SMTP_HOST", None)
 os.environ.pop("FEATHERLESS_API_KEY", None)
 os.environ.pop("OPENAI_API_KEY", None)
+os.environ.pop("QDRANT_URL", None)
+os.environ.pop("QDRANT_API_KEY", None)
 
 from app import app as flask_app, db, limiter  # noqa: E402
 from models import (  # noqa: E402

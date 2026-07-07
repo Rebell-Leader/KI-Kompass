@@ -42,7 +42,7 @@ KI Kompass (AI Compass) is a Munich-focused relocation and integration assistant
 - **LLM Integration**: OpenAI SDK directly - Featherless AI primary (OpenAI-compatible base_url), OpenAI fallback; no agent framework (a single grounded prompt doesn't need one)
 - **Conversation Management**: Per-conversation history stored in the database and passed to the model
 - **Context Awareness**: Profile-aware prompt with legal-guidance guardrails and source citations
-- **Knowledge Base**: fastembed embeddings + in-memory Qdrant retrieval over refreshed official documents (curated fallback)
+- **Knowledge Base**: Qdrant Cloud vector retrieval with server-side embedding inference (QDRANT_URL/QDRANT_API_KEY; no local embedding model), keyword-ranking fallback when unconfigured; content from refreshed official documents with curated fallback
 
 ## Action Steps Management
 - **Pre-defined Templates**: Database populated with Munich-specific relocation tasks
