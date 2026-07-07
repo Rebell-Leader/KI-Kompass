@@ -6,6 +6,8 @@
 #   SUPABASE_URL       https://<project-ref>.supabase.co   (enables Supabase auth)
 #   SUPABASE_ANON_KEY  the project's anon/public key
 #   FEATHERLESS_API_KEY or OPENAI_API_KEY   (enables AI chat)
+#   QDRANT_URL         https://<cluster>.cloud.qdrant.io:6333  (vector retrieval,
+#   QDRANT_API_KEY      embeddings run server-side in Qdrant Cloud)
 #   SMTP_* / MAIL_FROM (optional - email reminders; see DEPLOYMENT.md)
 
 services:
@@ -32,4 +34,8 @@ services:
       - key: SUPABASE_ANON_KEY
         sync: false
       - key: FEATHERLESS_API_KEY
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
         sync: false
