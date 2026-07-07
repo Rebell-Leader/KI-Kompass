@@ -4,7 +4,7 @@ import uuid
 from functools import wraps
 from urllib.parse import urlencode
 
-from flask import g, session, redirect, request, render_template, url_for
+from flask import g, session, redirect, request, render_template, url_for, Blueprint
 from flask_dance.consumer import (
     OAuth2ConsumerBlueprint,
     oauth_authorized,
@@ -22,6 +22,10 @@ from models import OAuth, User
 
 login_manager = LoginManager(app)
 
+# True when running outside Replit (no REPL_ID): a simple local login is used
+# instead of Replit OIDC so the app remains usable in any environment
+USING_DEV_AUTH = 'REPL_ID' not in os.environ
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -32,11 +36,51 @@ def load_user(user_id):
 # Using Flask-Dance's built-in session storage for OAuth tokens
 
 
+def make_dev_auth_blueprint():
+    """Local development login used when REPL_ID is not configured.
+
+    Registers the same blueprint/endpoint names the templates rely on
+    (replit_auth.login / replit_auth.logout) so no template changes are needed.
+    """
+    from app import db
+
+    dev_bp = Blueprint("replit_auth", __name__)
+
+    @dev_bp.route("/login")
+    def login():
+        user = db.session.get(User, "dev_user")
+        if not user:
+            user = User(
+                id="dev_user",
+                email="dev@example.com",
+                first_name="Dev",
+                last_name="User",
+            )
+            db.session.add(user)
+            db.session.commit()
+        login_user(user)
+        next_url = session.pop("next_url", None)
+        return redirect(next_url or url_for("index"))
+
+    @dev_bp.route("/logout")
+    def logout():
+        logout_user()
+        return redirect(url_for("index"))
+
+    @dev_bp.route("/error")
+    def error():
+        return render_template("403.html"), 403
+
+    return dev_bp
+
+
 def make_replit_blueprint():
-    try:
-        repl_id = os.environ['REPL_ID']
-    except KeyError:
-        raise SystemExit("the REPL_ID environment variable must be set")
+    if USING_DEV_AUTH:
+        import logging
+        logging.warning("REPL_ID not set - using local development login instead of Replit Auth")
+        return make_dev_auth_blueprint()
+
+    repl_id = os.environ['REPL_ID']
 
     issuer_url = os.environ.get('ISSUER_URL', "https://replit.com/oidc")
 
@@ -134,7 +178,15 @@ def require_login(f):
             session["next_url"] = get_next_navigation_url(request)
             return redirect(url_for('replit_auth.login'))
 
-        expires_in = replit.token.get('expires_in', 0)
+        if USING_DEV_AUTH:
+            return f(*args, **kwargs)
+
+        token = getattr(replit, 'token', None)
+        if not token:
+            session["next_url"] = get_next_navigation_url(request)
+            return redirect(url_for('replit_auth.login'))
+
+        expires_in = token.get('expires_in', 0)
         if expires_in < 0:
             issuer_url = os.environ.get('ISSUER_URL', "https://replit.com/oidc")
             refresh_token_url = issuer_url + "/token"

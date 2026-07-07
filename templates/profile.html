@@ -12,10 +12,10 @@
                 <div class="card-body p-4">
                     <div class="d-flex align-items-center mb-4">
                         <div style="width: 80px; height: 80px; border-radius: 50%; background-color: var(--primary); color: var(--secondary); display: flex; align-items: center; justify-content: center; font-size: 36px; margin-right: 24px;">
-                            {{ user.username[0]|upper }}
+                            {{ (user.full_name or user.email or '?')[0]|upper }}
                         </div>
                         <div>
-                            <h2 class="mb-1">{{ user.full_name or user.username }}</h2>
+                            <h2 class="mb-1">{{ user.full_name or user.email or 'New User' }}</h2>
                             <p class="mb-0 text-muted">{{ user.email }}</p>
                         </div>
                     </div>
@@ -24,15 +24,13 @@
                         <li class="nav-item" role="presentation">
                             <a class="nav-link active" id="personal-tab" data-bs-toggle="tab" href="#personal" role="tab" aria-controls="personal" aria-selected="true">Personal Information</a>
                         </li>
-                        <li class="nav-item" role="presentation">
-                            <a class="nav-link" id="security-tab" data-bs-toggle="tab" href="#security" role="tab" aria-controls="security" aria-selected="false">Security</a>
-                        </li>
                     </ul>
-                    
+
                     <div class="tab-content" id="profileTabsContent">
                         <!-- Personal Information Tab -->
                         <div class="tab-pane fade show active" id="personal" role="tabpanel" aria-labelledby="personal-tab">
-                            <form action="{{ url_for('update_profile', user_id=user.id) }}" method="POST" id="profile-form">
+                            <form action="{{ url_for('update_profile') }}" method="POST" id="profile-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <div class="row mb-3">
                                     <div class="col-md-6">
                                         <div class="form-group mb-3">
@@ -184,31 +182,8 @@
                                 </div>
                             </form>
                         </div>
-                        
-                        <!-- Security Tab -->
-                        <div class="tab-pane fade" id="security" role="tabpanel" aria-labelledby="security-tab">
-                            <form action="{{ url_for('update_profile', user_id=user.id) }}" method="POST" id="password-form">
-                                <div class="form-group mb-3">
-                                    <label for="old_password" class="form-label">Current Password</label>
-                                    <input type="password" id="old_password" name="old_password" class="form-control" required>
-                                </div>
-                                
-                                <div class="form-group mb-3">
-                                    <label for="new_password" class="form-label">New Password</label>
-                                    <input type="password" id="new_password" name="new_password" class="form-control" required minlength="8">
-                                    <small class="form-text text-muted">Password must be at least 8 characters long</small>
-                                </div>
-                                
-                                <div class="form-group mb-4">
-                                    <label for="confirm_password" class="form-label">Confirm New Password</label>
-                                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" required minlength="8">
-                                </div>
-                                
-                                <div class="text-end">
-                                    <button type="submit" class="btn btn-primary">Update Password</button>
-                                </div>
-                            </form>
-                        </div>
+                        <!-- Password management removed: accounts are authenticated
+                             via OAuth (Replit Auth), so no local passwords exist -->
                     </div>
                 </div>
             </div>
@@ -227,28 +202,6 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Tab functionality for profile/security tabs
-        const personalTab = document.getElementById('personal-tab');
-        const securityTab = document.getElementById('security-tab');
-        const personalPane = document.getElementById('personal');
-        const securityPane = document.getElementById('security');
-        
-        personalTab.addEventListener('click', function(e) {
-            e.preventDefault();
-            personalTab.classList.add('active');
-            securityTab.classList.remove('active');
-            personalPane.classList.add('show', 'active');
-            securityPane.classList.remove('show', 'active');
-        });
-        
-        securityTab.addEventListener('click', function(e) {
-            e.preventDefault();
-            securityTab.classList.add('active');
-            personalTab.classList.remove('active');
-            securityPane.classList.add('show', 'active');
-            personalPane.classList.remove('show', 'active');
-        });
-        
         // Toggle family details based on radio selection
         const familyRadios = document.querySelectorAll('input[name="has_family"]');
         const familyDetails = document.querySelector('.family-details');

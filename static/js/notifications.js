@@ -176,7 +176,8 @@ class NotificationManager {
             await fetch(`/api/notifications/${notificationId}/read`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCsrfToken()
                 }
             });
         } catch (error) {

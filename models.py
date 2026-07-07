@@ -85,7 +85,14 @@ class ActionStep(db.Model):
     address = Column(String(256))
     required_documents = Column(JSON, default=list)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+    # Data provenance: where this step's information comes from and when it
+    # was last checked against that source (updated by 'flask refresh-knowledge')
+    source_url = Column(String(256))
+    last_verified = Column(DateTime)
+    # Direct link to the official online appointment booking (Terminvereinbarung)
+    # for steps that require one
+    booking_url = Column(String(256))
+
     # Relationships
     task_statuses = relationship("TaskStatus", back_populates="action_step")
     
@@ -109,6 +116,24 @@ class TaskStatus(db.Model):
     
     def __repr__(self):
         return f"<TaskStatus {self.id} for step {self.action_step_id}>"
+
+
+class KnowledgeDocument(db.Model):
+    """Text fetched from an official source, used to ground AI chat answers.
+
+    Rows are created/updated by the 'flask refresh-knowledge' command; the
+    chat falls back to a curated built-in knowledge base when this is empty.
+    """
+    __tablename__ = 'knowledge_documents'
+
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200), nullable=False)
+    content = Column(Text, nullable=False)
+    source_url = Column(String(256), unique=True, nullable=False)
+    fetched_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<KnowledgeDocument {self.title} ({self.source_url})>"
 
 
 class ChatMessage(db.Model):

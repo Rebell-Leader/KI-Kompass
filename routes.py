@@ -1,9 +1,9 @@
 from flask import session, render_template, redirect, url_for, request, jsonify, flash
 from flask_login import current_user, login_required
-from app import app, db
+from app import app, db, csrf, limiter
 from replit_auth import require_login, make_replit_blueprint
 from models import User, IntegrationPipeline, ActionStep, TaskStatus, ChatMessage
-from services.pipeline_engine import generate_pipeline
+from services.pipeline_engine import generate_pipeline, calculate_progress
 from services.ai_assistant import get_ai_response
 from services.notification_service import NotificationService
 from datetime import datetime, timedelta
@@ -24,9 +24,15 @@ def ensure_database_initialized():
         logging.info("Database tables created")
         
         # Populate action steps if they don't exist
+        from data.action_steps import populate_action_steps, backfill_provenance
         if ActionStep.query.count() == 0:
-            from data.action_steps import populate_action_steps
             populate_action_steps(db)
+
+        # Stamp source_url/last_verified on rows created before those columns existed
+        try:
+            backfill_provenance(db)
+        except Exception as e:
+            logging.warning(f"Could not backfill action step provenance: {str(e)}")
         
         # Create performance indexes
         try:
@@ -36,6 +42,43 @@ def ensure_database_initialized():
             logging.warning(f"Could not create performance indexes: {str(e)}")
         
         _db_initialized = True
+
+def build_task_data(task_status, action_step):
+    """Flatten a (TaskStatus, ActionStep) pair into the dict shape templates expect"""
+    return {
+        'id': task_status.id,
+        'title': action_step.title,
+        'description': action_step.description,
+        'category': action_step.category,
+        'priority': action_step.priority,
+        'estimated_time': action_step.estimated_time,
+        'timeline_offset': action_step.timeline_offset,
+        'deadline': task_status.deadline,
+        'completed': task_status.completed,
+        'notes': task_status.notes,
+        'url': action_step.url,
+        'address': action_step.address,
+        'required_documents': action_step.required_documents,
+        'source_url': action_step.source_url,
+        'last_verified': action_step.last_verified,
+        'booking_url': action_step.booking_url,
+        'prerequisites': action_step.prerequisites or [],
+        'blocked_by': []
+    }
+
+def annotate_blocked_tasks(tasks):
+    """Mark tasks whose prerequisites (by step title) are in this pipeline
+    but not yet completed. Prerequisites that were never selected for this
+    user's pipeline don't block anything."""
+    titles_in_pipeline = {t['title'] for t in tasks}
+    completed_titles = {t['title'] for t in tasks if t['completed']}
+
+    for task in tasks:
+        task['blocked_by'] = [
+            p for p in task['prerequisites']
+            if p in titles_in_pipeline and p not in completed_titles
+        ]
+    return tasks
 
 # Make session permanent and ensure OAuth state persistence
 @app.before_request
@@ -77,18 +120,22 @@ def dashboard():
             flash("Error creating your personalized pipeline. Please try again.", "error")
             return redirect(url_for('onboarding'))
     
-    # Get tasks with action step details
-    tasks = db.session.query(TaskStatus, ActionStep).join(
+    # Get tasks with action step details, flattened into the shape the template expects
+    task_rows = db.session.query(TaskStatus, ActionStep).join(
         ActionStep, TaskStatus.action_step_id == ActionStep.id
     ).filter(TaskStatus.pipeline_id == pipeline.id).all()
-    
-    # Separate completed and upcoming tasks
-    completed_tasks = [task for task in tasks if task[0].completed]
-    upcoming_tasks = [task for task in tasks if not task[0].completed]
-    
-    return render_template('dashboard.html', 
-                         user=user, 
-                         pipeline=pipeline, 
+
+    tasks = [build_task_data(task_status, action_step) for task_status, action_step in task_rows]
+    annotate_blocked_tasks(tasks)
+
+    # Separate completed and upcoming tasks; actionable (unblocked) tasks first
+    completed_tasks = [task for task in tasks if task['completed']]
+    upcoming_tasks = [task for task in tasks if not task['completed']]
+    upcoming_tasks.sort(key=lambda x: (bool(x['blocked_by']), x['priority'], x['deadline'] or datetime.max))
+
+    return render_template('dashboard.html',
+                         user=user,
+                         pipeline=pipeline,
                          tasks=tasks,
                          completed_tasks=completed_tasks,
                          upcoming_tasks=upcoming_tasks,
@@ -108,7 +155,7 @@ def onboarding():
         user.visa_type = request.form.get('visa_type')
         user.has_family = request.form.get('has_family') == 'true'
         user.spouse_nationality = request.form.get('spouse_nationality')
-        user.num_children = int(request.form.get('num_children', 0))
+        user.num_children = int(request.form.get('num_children') or 0)
         user.employment_status = request.form.get('employment_status')
         user.german_level = request.form.get('german_level')
         user.onboarded = True
@@ -135,6 +182,41 @@ def profile():
     user = current_user
     return render_template('profile.html', user=user)
 
+@app.route('/profile/update', methods=['POST'])
+@require_login
+def update_profile():
+    """Update the current user's profile fields"""
+    user = current_user
+    try:
+        user.full_name = request.form.get('full_name') or user.full_name
+        user.nationality = request.form.get('nationality') or user.nationality
+        user.visa_type = request.form.get('visa_type') or user.visa_type
+        user.german_level = request.form.get('german_level') or user.german_level
+        user.employment_status = request.form.get('employment_status') or user.employment_status
+        user.spouse_nationality = request.form.get('spouse_nationality') or user.spouse_nationality
+
+        has_family = request.form.get('has_family')
+        if has_family is not None:
+            user.has_family = has_family == 'true'
+
+        num_children = request.form.get('num_children')
+        if num_children is not None and num_children != '':
+            user.num_children = int(num_children)
+
+        arrival_date_str = request.form.get('arrival_date')
+        if arrival_date_str:
+            user.arrival_date = datetime.strptime(arrival_date_str, '%Y-%m-%d')
+
+        db.session.commit()
+        flash('Profile updated successfully.', 'success')
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error updating profile for user {user.id}: {str(e)}")
+        flash('Error updating profile. Please try again.', 'error')
+
+    return redirect(url_for('profile'))
+
 @app.route('/chat')
 @require_login
 def chat():
@@ -143,15 +225,22 @@ def chat():
     return render_template('chat.html', user=user)
 
 @app.route('/api/chat', methods=['POST'])
-@require_login
+@limiter.limit("20 per minute; 300 per day")
 def api_chat():
-    """API endpoint for chat messages"""
+    """API endpoint for chat messages (logged-in users and demo sessions)"""
     try:
-        user = current_user
-        data = request.json
-        message = data.get('message', '').strip()
-        conversation_id = data.get('conversation_id', 'default')
-        
+        owner_id = _current_task_owner_id()
+        if not owner_id:
+            return jsonify({"error": "Not authenticated"}), 401
+
+        user = db.session.get(User, owner_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        data = request.get_json(silent=True) or {}
+        message = (data.get('message') or '').strip()
+        conversation_id = data.get('conversation_id') or 'default'
+
         if not message:
             return jsonify({"error": "Message cannot be empty"}), 400
         
@@ -218,44 +307,190 @@ def mark_notification_read(notification_id):
         logger.error(f"Mark notification read error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
+def _apply_task_update(task_id, owner_user_id, completed, notes):
+    """Update a task owned by the given user; returns (task_status, progress) or (None, None)"""
+    task_status = TaskStatus.query.join(
+        IntegrationPipeline, TaskStatus.pipeline_id == IntegrationPipeline.id
+    ).filter(
+        TaskStatus.id == task_id,
+        IntegrationPipeline.user_id == owner_user_id
+    ).first()
+
+    if not task_status:
+        return None, None
+
+    task_status.completed = completed
+    if notes is not None:
+        task_status.notes = notes
+    task_status.completion_date = datetime.utcnow() if completed else None
+    db.session.commit()
+
+    progress = calculate_progress(task_status.pipeline_id)
+    return task_status, progress
+
+def _current_task_owner_id():
+    """Resolve the user id owning tasks for this request (logged-in or demo session)"""
+    if current_user.is_authenticated:
+        return current_user.id
+    if session.get('demo_mode') and session.get('demo_user_id'):
+        return session['demo_user_id']
+    return None
+
+@app.route('/api/task/update', methods=['POST'])
+def api_task_update():
+    """Update task completion status (endpoint used by the frontend JS)"""
+    try:
+        owner_id = _current_task_owner_id()
+        if not owner_id:
+            return jsonify({"error": "Not authenticated"}), 401
+
+        data = request.get_json(silent=True) or {}
+        try:
+            task_id = int(data.get('task_id'))
+        except (TypeError, ValueError):
+            return jsonify({"error": "task_id is required"}), 400
+
+        task_status, progress = _apply_task_update(
+            task_id, owner_id,
+            completed=bool(data.get('completed', False)),
+            notes=data.get('notes', '')
+        )
+        if not task_status:
+            return jsonify({"error": "Task not found"}), 404
+
+        return jsonify({"success": True, "progress": progress, "message": "Task updated successfully"})
+
+    except Exception as e:
+        logger.error(f"Update task error: {str(e)}")
+        return jsonify({"error": "Failed to update task"}), 500
+
+@app.route('/api/tasks/optional', methods=['GET'])
+def api_get_optional_tasks():
+    """Action steps not in the current user's pipeline, available to add manually"""
+    try:
+        owner_id = _current_task_owner_id()
+        if not owner_id:
+            return jsonify({"error": "Not authenticated"}), 401
+
+        pipeline = IntegrationPipeline.query.filter_by(user_id=owner_id).first()
+        if not pipeline:
+            return jsonify({"error": "No pipeline found"}), 404
+
+        existing_step_ids = {ts.action_step_id for ts in pipeline.task_statuses}
+        optional_steps = [s for s in ActionStep.query.all() if s.id not in existing_step_ids]
+
+        return jsonify({
+            "success": True,
+            "tasks": [{
+                "id": step.id,
+                "title": step.title,
+                "description": step.description,
+                "category": step.category,
+                "priority": step.priority,
+                "estimated_time": step.estimated_time
+            } for step in optional_steps]
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting optional tasks: {str(e)}")
+        return jsonify({"error": "Failed to load optional tasks"}), 500
+
+@app.route('/api/tasks/add', methods=['POST'])
+def api_add_task():
+    """Add an optional action step to the current user's pipeline"""
+    try:
+        owner_id = _current_task_owner_id()
+        if not owner_id:
+            return jsonify({"error": "Not authenticated"}), 401
+
+        data = request.get_json(silent=True) or {}
+        try:
+            action_step_id = int(data.get('task_id'))
+        except (TypeError, ValueError):
+            return jsonify({"error": "task_id is required"}), 400
+
+        pipeline = IntegrationPipeline.query.filter_by(user_id=owner_id).first()
+        if not pipeline:
+            return jsonify({"error": "No pipeline found"}), 404
+
+        action_step = db.session.get(ActionStep, action_step_id)
+        if not action_step:
+            return jsonify({"error": "Task not found"}), 404
+
+        # Idempotent: adding a step that is already in the pipeline is a no-op
+        existing = TaskStatus.query.filter_by(
+            pipeline_id=pipeline.id, action_step_id=action_step_id
+        ).first()
+        if not existing:
+            user = db.session.get(User, owner_id)
+            arrival_date = (user.arrival_date if user and user.arrival_date else datetime.utcnow())
+            deadline = arrival_date + timedelta(days=action_step.timeline_offset) if action_step.timeline_offset else None
+            db.session.add(TaskStatus(
+                pipeline_id=pipeline.id,
+                action_step_id=action_step_id,
+                completed=False,
+                deadline=deadline
+            ))
+            db.session.commit()
+            calculate_progress(pipeline.id)
+
+        return jsonify({"success": True, "message": "Task added to your pipeline"})
+
+    except Exception as e:
+        logger.error(f"Error adding task: {str(e)}")
+        return jsonify({"error": "Failed to add task"}), 500
+
+@app.route('/api/pipeline/regenerate', methods=['POST'])
+def api_regenerate_pipeline():
+    """Delete the current user's pipeline and rebuild it from their profile"""
+    try:
+        owner_id = _current_task_owner_id()
+        if not owner_id:
+            return jsonify({"error": "Not authenticated"}), 401
+
+        pipeline = IntegrationPipeline.query.filter_by(user_id=owner_id).first()
+        if pipeline:
+            db.session.delete(pipeline)  # cascade removes its task statuses
+            db.session.commit()
+
+        new_pipeline = generate_pipeline(owner_id)
+
+        return jsonify({
+            "success": True,
+            "pipeline_id": new_pipeline.id,
+            "message": "Pipeline regenerated successfully"
+        })
+
+    except Exception as e:
+        logger.error(f"Error regenerating pipeline: {str(e)}")
+        db.session.rollback()
+        return jsonify({"error": "Failed to regenerate pipeline"}), 500
+
 @app.route('/api/tasks/<int:task_id>/update', methods=['POST'])
 @require_login
 def update_task(task_id):
     """Update task completion status"""
     try:
-        user = current_user
-        data = request.json
-        completed = data.get('completed', False)
-        notes = data.get('notes', '')
-        
-        # Get the task status
-        task_status = TaskStatus.query.filter_by(
-            id=task_id,
-            pipeline__user_id=user.id
-        ).first()
-        
+        data = request.get_json(silent=True) or {}
+        task_status, progress = _apply_task_update(
+            task_id, current_user.id,
+            completed=bool(data.get('completed', False)),
+            notes=data.get('notes', '')
+        )
         if not task_status:
             return jsonify({"error": "Task not found"}), 404
-        
-        # Update task status
-        task_status.completed = completed
-        task_status.notes = notes
-        if completed:
-            task_status.completion_date = datetime.utcnow()
-        else:
-            task_status.completion_date = None
-        
-        db.session.commit()
-        
-        return jsonify({"success": True, "message": "Task updated successfully"})
-        
+
+        return jsonify({"success": True, "progress": progress, "message": "Task updated successfully"})
+
     except Exception as e:
         logger.error(f"Update task error: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to update task"}), 500
 
 # Additional API endpoints for comprehensive testing
 
 @app.route('/api/users', methods=['POST'])
+@csrf.exempt  # external API endpoint, no browser session to protect
+@limiter.limit("30 per minute")
 def api_create_user():
     """Create a new user profile"""
     try:
@@ -296,6 +531,8 @@ def api_create_user():
         return jsonify({"error": "Failed to create user"}), 500
 
 @app.route('/api/pipelines', methods=['POST'])
+@csrf.exempt  # external API endpoint, no browser session to protect
+@limiter.limit("30 per minute")
 def api_create_pipeline():
     """Create a new integration pipeline for a user"""
     try:
@@ -411,10 +648,37 @@ def api_get_upcoming_tasks():
 
 # Demo Mode Routes
 
+def cleanup_stale_demo_users(max_age_hours=24):
+    """Delete demo users (and their pipelines/messages) older than max_age_hours.
+
+    Demo sessions that never hit /demo/end would otherwise accumulate forever.
+    Called opportunistically when a new demo starts.
+    """
+    try:
+        cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
+        stale_users = User.query.filter(
+            User.id.like('demo\\_%', escape='\\'),
+            User.created_at < cutoff
+        ).all()
+
+        for user in stale_users:
+            ChatMessage.query.filter_by(user_id=user.id).delete()
+            db.session.delete(user)  # cascades to pipelines and task statuses
+
+        if stale_users:
+            db.session.commit()
+            logger.info(f"Cleaned up {len(stale_users)} stale demo user(s)")
+
+    except Exception as e:
+        db.session.rollback()
+        logger.warning(f"Demo cleanup failed: {str(e)}")
+
 @app.route('/demo')
 def demo_mode():
     """Start demo mode - show onboarding directly"""
     try:
+        cleanup_stale_demo_users()
+
         # Create demo user with session ID
         demo_session_id = f"demo_{datetime.now().timestamp()}"
         
@@ -461,7 +725,7 @@ def demo_onboarding_submit():
         arrival_date_str = request.form.get('arrival_date')
         has_family = request.form.get('has_family') == 'true'
         spouse_nationality = request.form.get('spouse_nationality', '')
-        num_children = int(request.form.get('num_children', 0))
+        num_children = int(request.form.get('num_children') or 0)
         employment_status = request.form.get('employment_status', 'Employed')
         german_level = request.form.get('german_level', 'A1')
         
@@ -535,29 +799,13 @@ def demo_dashboard():
         completed_tasks = []
         
         if pipeline:
-            for task_status in pipeline.task_statuses:
-                task_data = {
-                    'id': task_status.id,
-                    'title': task_status.action_step.title,
-                    'description': task_status.action_step.description,
-                    'category': task_status.action_step.category,
-                    'priority': task_status.action_step.priority,
-                    'estimated_time': task_status.action_step.estimated_time,
-                    'deadline': task_status.deadline,
-                    'completed': task_status.completed,
-                    'notes': task_status.notes,
-                    'url': task_status.action_step.url,
-                    'address': task_status.action_step.address,
-                    'required_documents': task_status.action_step.required_documents
-                }
-                
-                if task_status.completed:
-                    completed_tasks.append(task_data)
-                else:
-                    upcoming_tasks.append(task_data)
-        
-        # Sort upcoming tasks by priority and deadline
-        upcoming_tasks.sort(key=lambda x: (x['priority'], x['deadline'] or datetime.max))
+            all_tasks = [build_task_data(ts, ts.action_step) for ts in pipeline.task_statuses]
+            annotate_blocked_tasks(all_tasks)
+            completed_tasks = [t for t in all_tasks if t['completed']]
+            upcoming_tasks = [t for t in all_tasks if not t['completed']]
+
+        # Sort upcoming tasks: actionable first, then by priority and deadline
+        upcoming_tasks.sort(key=lambda x: (bool(x['blocked_by']), x['priority'], x['deadline'] or datetime.max))
         
         return render_template('demo_dashboard.html',
                              demo_mode=True,
@@ -595,9 +843,10 @@ def demo_update_task(task_id):
             task_status.completion_date = datetime.utcnow()
         else:
             task_status.completion_date = None
-        
+
         db.session.commit()
-        
+        calculate_progress(task_status.pipeline_id)
+
         action = "completed" if completed else "reopened"
         flash(f'Task "{task_status.action_step.title}" {action} successfully!', 'success')
         

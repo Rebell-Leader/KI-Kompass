@@ -102,10 +102,34 @@ KI Kompass (AI Compass) is a Munich-focused relocation and integration assistant
 - **JavaScript**: Feature-specific scripts for enhanced interactivity
 - **Templates**: Jinja2 templates with inheritance for consistent UI
 
+# Keeping Data Fresh
+
+Task details (working hours, fees, required documents) and the AI knowledge
+base are grounded in official sources. Each action step stores a `source_url`
+and a `last_verified` date, shown to users on the task cards.
+
+Run `flask refresh-knowledge` to fetch the current text of every official
+source page into the `knowledge_documents` table; the chat assistant answers
+from that content (with source citations) and each step's `last_verified`
+date is bumped when its source is fetched successfully. Schedule this command
+(e.g. daily via cron or a scheduled deployment) to keep the data current.
+When the table is empty, a curated built-in knowledge base is used as fallback.
+
+# Email Reminders
+
+Run `flask send-reminders` (schedule daily) to email every real onboarded user
+a digest of their overdue tasks and tasks due within 7 days. Configure SMTP via
+environment variables - any provider's SMTP endpoint works:
+`SMTP_HOST`, `SMTP_PORT` (default 587), `SMTP_USERNAME`, `SMTP_PASSWORD`,
+`SMTP_STARTTLS` (default true), `MAIL_FROM`. When unconfigured, the command
+reports it and sends nothing.
+
 # Changelog
 
 Changelog:
 - June 29, 2025. Initial setup
+- July 7, 2026. MVP fixes, security hardening (CSRF, rate limiting), Alembic
+  migrations, official-source data provenance and knowledge refresh pipeline.
 
 # User Preferences
 

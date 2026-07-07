@@ -207,23 +207,21 @@ class NotificationService:
     @staticmethod
     def send_email_notification(user_id: int, notification: Dict) -> bool:
         """
-        Send email notification (placeholder for future implementation)
+        Send a single notification by email (SMTP configured via env vars;
+        see services/email_service.py). Daily digests are handled by
+        'flask send-reminders'.
         """
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user or not user.email:
                 return False
-            
-            # Placeholder for email service integration
-            logger.info(f"Would send email to {user.email}: {notification['title']}")
-            
-            # Future implementation would integrate with services like:
-            # - SendGrid
-            # - AWS SES
-            # - Mailgun
-            # - SMTP server
-            
-            return True
+
+            from services.email_service import send_email
+            return send_email(
+                user.email,
+                f"KI Kompass: {notification['title']}",
+                notification.get('message', '')
+            )
         except Exception as e:
             logger.error(f"Error sending email notification: {str(e)}")
             return False

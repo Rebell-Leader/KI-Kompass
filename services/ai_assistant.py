@@ -2,7 +2,6 @@ import os
 import logging
 import time
 import uuid
-from services.llm_engine import get_conversation_chain, get_basic_chain
 from models import ChatMessage
 from app import db
 
@@ -35,6 +34,18 @@ def get_ai_response(query, user, conversation_id=None):
         return "AI assistant is currently unavailable. Please set up either Featherless AI or OpenAI API key.", conversation_id
     
     try:
+        # Fetch conversation history BEFORE saving the new message, then build
+        # (user, assistant) pairs for the retrieval chain's chat_history input
+        prev_messages = ChatMessage.get_conversation(user.id, conversation_id)
+        chat_history = []
+        last_user_content = None
+        for m in prev_messages:
+            if m.role == 'user':
+                last_user_content = m.content
+            elif m.role == 'assistant' and last_user_content is not None:
+                chat_history.append((last_user_content, m.content))
+                last_user_content = None
+
         # Save the user message to the database
         user_message = ChatMessage(
             user_id=user.id,
@@ -44,7 +55,7 @@ def get_ai_response(query, user, conversation_id=None):
         )
         db.session.add(user_message)
         db.session.commit()
-        
+
         # Prepare user profile context - handling potential None values
         user_profile = {
             "nationality": user.nationality or "Not specified",
@@ -54,59 +65,45 @@ def get_ai_response(query, user, conversation_id=None):
             "german_level": user.german_level or "Not specified"
         }
         
-        # Determine if this is a relocation-specific query
-        relocation_keywords = ['munich', 'germany', 'visa', 'registration', 'anmeldung', 'residence', 'permit', 'housing', 'apartment', 'bank', 'insurance', 'tax', 'bureaucracy']
-        is_relocation_query = any(keyword in query.lower() for keyword in relocation_keywords)
+        logger.info(f"Processing query: '{query}' (conversation: {conversation_id})")
         
-        # Get previous conversation history for context
-        prev_messages = ChatMessage.get_conversation(user.id, conversation_id)
-        conversation_summary = ChatMessage.get_conversation_summary(user.id, conversation_id)
-        
-        logger.info(f"Processing query: '{query}' (relocation-specific: {is_relocation_query}, conversation: {conversation_id})")
-        
-        # Include some conversation context in the query if available
-        context_prompt = ""
-        if len(prev_messages) > 1:  # Skip if this is the first message
-            context_prompt = f"Based on our conversation about {conversation_summary}, "
-        
-        # Attempt with robust error handling and shorter timeout
+        # Attempt with robust error handling
         try:
-            # Set timeout for LLM request
             start_time = time.time()
-            max_time = 3.0  # 3 seconds max to avoid worker timeout
-            
+
             ai_response = ""
-            
+
             # For very simple queries, provide direct responses without LLM
             if len(query.strip()) <= 3:
                 ai_response = "I'm your Munich relocation assistant. Could you please ask a more detailed question about moving to Munich?"
             elif query.lower() in ["hello", "hi", "hey", "hallo", "greetings"]:
                 ai_response = f"Hello{' ' + user.full_name if user.full_name else ''}! I'm KI Kompass, your Munich relocation assistant. How can I help you today?"
             else:
-                # Only use LLM for more complex queries
-                if is_relocation_query:
-                    # Use conversational retrieval chain for relocation-specific queries
-                    chain = get_conversation_chain()
-                    response = chain({"question": context_prompt + query})
-                    ai_response = response.get("answer", "I don't have specific information about that aspect of relocation.")
-                else:
-                    # Use basic chain for general queries
-                    chain = get_basic_chain()
-                    response = chain({
-                        "user_profile": str(user_profile), 
-                        "query": context_prompt + query
-                    })
-                    ai_response = response.get("text", "I'm not sure how to answer that question.")
-                
-                # Check if we're approaching the timeout
-                elapsed = time.time() - start_time
-                if elapsed > max_time * 0.8:  # If we're using more than 80% of our time budget
-                    logger.warning(f"LLM response taking too long ({elapsed:.2f}s), truncating")
-                    if ai_response:
-                        # Truncate the response to avoid further processing time
-                        ai_response = ai_response[:100] + "... (response truncated due to time constraints)"
-                    else:
-                        ai_response = "I apologize, but I couldn't generate a complete response in time. Please try asking a simpler question."
+                # Import lazily so the app can start without the LLM stack installed
+                from services.llm_engine import get_answer_chain, retrieve_context
+
+                # Retrieve relevant official knowledge and format recent history
+                # (last 5 exchanges keeps the prompt bounded)
+                context, sources = retrieve_context(query)
+                history_text = "\n".join(
+                    f"User: {u}\nAssistant: {a}" for u, a in chat_history[-5:]
+                ) or "(no previous messages)"
+
+                chain = get_answer_chain()
+                response = chain.invoke({
+                    "context": context,
+                    "user_profile": str(user_profile),
+                    "chat_history": history_text,
+                    "question": query
+                })
+                ai_response = response.get("text", "I'm not sure how to answer that question.")
+
+                # Cite where the grounding information came from so users can
+                # verify current details on the official pages
+                if sources:
+                    ai_response += "\n\nSources:\n" + "\n".join(f"• {s}" for s in sources)
+
+                logger.info(f"LLM response generated in {time.time() - start_time:.2f}s")
             
             # Save the assistant response to the database
             assistant_message = ChatMessage(

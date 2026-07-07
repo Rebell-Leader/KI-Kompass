@@ -160,7 +160,15 @@
                                                 <a href="{{ task.url }}" target="_blank" rel="noopener noreferrer">{{ task.url }}</a>
                                             </div>
                                         {% endif %}
-                                        
+
+                                        {% if task.source_url %}
+                                            <div class="mb-3">
+                                                <small class="text-muted">
+                                                    <a href="{{ task.source_url }}" target="_blank" rel="noopener noreferrer">Official source</a>{% if task.last_verified %} · information verified {{ task.last_verified.strftime('%d %b %Y') }}{% endif %} — always confirm current hours, fees and documents there.
+                                                </small>
+                                            </div>
+                                        {% endif %}
+
                                         <div class="form-group mb-0">
                                             <label for="task-notes-{{ task.id }}" class="form-label">Your Notes:</label>
                                             <textarea id="task-notes-{{ task.id }}" class="form-control task-notes" data-task-id="{{ task.id }}" rows="2" placeholder="Add your notes here..."></textarea>
@@ -176,6 +184,12 @@
                                                 <span class="badge badge-warning">Medium Priority</span>
                                             {% else %}
                                                 <span class="badge badge-info">Low Priority</span>
+                                            {% endif %}
+                                            {% if task.blocked_by %}
+                                                <span class="badge badge-warning" title="Complete the prerequisite task(s) first">Waiting for: {{ task.blocked_by|join(', ') }}</span>
+                                            {% endif %}
+                                            {% if task.booking_url %}
+                                                <a href="{{ task.booking_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-primary ms-2">Book Appointment</a>
                                             {% endif %}
                                         </div>
                                         <div class="step-actions">

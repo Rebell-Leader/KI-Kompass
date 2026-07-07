@@ -20,6 +20,7 @@
                     </div>
 
                     <form method="POST" action="/demo/submit">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <!-- Personal Information -->
                         <div class="mb-4">
                             <h5 class="text-primary mb-3">Personal Information</h5>

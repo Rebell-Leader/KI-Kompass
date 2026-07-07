@@ -450,21 +450,47 @@ Could you be more specific about what aspect of moving to Munich you'd like help
 
     function handleSubmit(message) {
         if (!message.trim()) return;
-        
+
         // Add user message
         addMessage(message, true);
-        
+
         // Show typing indicator
         showTypingIndicator();
-        
-        // Simulate AI response delay
-        setTimeout(() => {
-            removeTypingIndicator();
-            const response = getResponse(message);
-            addMessage(response, false);
-        }, 1500 + Math.random() * 1000); // 1.5-2.5 second delay
-        
         messageInput.value = '';
+
+        // Ask the real AI assistant; fall back to canned demo answers when the
+        // AI service is not configured or the request fails
+        fetch('/api/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                message: message,
+                conversation_id: sessionStorage.getItem('demo_conversation_id') || null
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            removeTypingIndicator();
+            const aiUnavailable = !data.response ||
+                data.error ||
+                data.response.startsWith('AI assistant is currently unavailable');
+            if (aiUnavailable) {
+                addMessage(getResponse(message), false);
+            } else {
+                addMessage(data.response, false);
+                if (data.conversation_id) {
+                    sessionStorage.setItem('demo_conversation_id', data.conversation_id);
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Chat error, using demo response:', error);
+            removeTypingIndicator();
+            addMessage(getResponse(message), false);
+        });
     }
 
     // Handle form submission
