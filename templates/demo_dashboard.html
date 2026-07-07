@@ -13,11 +13,11 @@
                     <strong>Demo Mode Active</strong> - Welcome {{ user.full_name }}! This is your personalized Munich integration pipeline.
                 </div>
                 <div>
-                    <a href="{{ url_for('demo_chat') }}" class="btn btn-sm btn-outline-success me-2">
+                    <a href="{{ url_for('demo.chat') }}" class="btn btn-sm btn-outline-success me-2">
                         <i data-feather="message-circle" class="me-1"></i>
                         Try AI Chat
                     </a>
-                    <a href="{{ url_for('end_demo') }}" class="btn btn-sm btn-outline-danger">
+                    <a href="{{ url_for('demo.end') }}" class="btn btn-sm btn-outline-danger">
                         <i data-feather="x" class="me-1"></i>
                         End Demo
                     </a>
@@ -234,7 +234,7 @@
                                     </div>
                                     
                                     <div class="task-actions ms-3">
-                                        <form method="POST" action="{{ url_for('demo_update_task', task_id=task.id) }}" class="d-inline">
+                                        <form method="POST" action="{{ url_for('demo.update_task', task_id=task.id) }}" class="d-inline">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                             <input type="hidden" name="completed" value="true">
                                             <button type="submit" class="btn btn-success btn-sm" title="Mark as completed">
@@ -275,7 +275,7 @@
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2">
-                        <a href="{{ url_for('demo_chat') }}" class="btn btn-primary">
+                        <a href="{{ url_for('demo.chat') }}" class="btn btn-primary">
                             <i data-feather="message-circle" class="me-2"></i>
                             Ask AI Assistant
                         </a>
@@ -309,7 +309,7 @@
                                 <div class="fw-medium">{{ task.title }}</div>
                                 <small class="text-muted">{{ task.category.replace('_', ' ') }}</small>
                             </div>
-                            <form method="POST" action="{{ url_for('demo_update_task', task_id=task.id) }}" class="d-inline">
+                            <form method="POST" action="{{ url_for('demo.update_task', task_id=task.id) }}" class="d-inline">
                                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <input type="hidden" name="completed" value="false">
                                 <button type="submit" class="btn btn-link btn-sm p-0 text-muted" title="Mark as incomplete">

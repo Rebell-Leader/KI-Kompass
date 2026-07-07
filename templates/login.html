@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Log In - KI Kompass{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 480px;">
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <h2 class="mb-4 text-center">Welcome to KI Kompass</h2>
+
+            <form action="{{ url_for('auth.login') }}" method="POST" class="mb-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <input type="email" id="email" name="email" class="form-control" required autocomplete="email">
+                </div>
+                <div class="form-group mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" name="password" class="form-control" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Log In</button>
+            </form>
+
+            <hr>
+            <p class="text-muted text-center mb-2">New to KI Kompass?</p>
+            <form action="{{ url_for('auth.signup') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group mb-3">
+                    <label for="signup-email" class="form-label">Email</label>
+                    <input type="email" id="signup-email" name="email" class="form-control" required autocomplete="email">
+                </div>
+                <div class="form-group mb-3">
+                    <label for="signup-password" class="form-label">Password <small class="text-muted">(min. 8 characters)</small></label>
+                    <input type="password" id="signup-password" name="password" class="form-control" required minlength="8" autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn btn-outline-primary w-100">Create Account</button>
+            </form>
+
+            <p class="text-muted text-center mt-4 mb-0">
+                <a href="{{ url_for('demo.index') }}">Or try the demo without an account</a>
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}

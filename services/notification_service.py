@@ -18,27 +18,35 @@ class NotificationService:
         Get all pending notifications for a user
         """
         try:
-            user = User.query.get(user_id)
+            user = db.session.get(User, user_id)
             if not user:
                 return []
             
             notifications = []
-            
+
             # Check for overdue tasks
             overdue_notifications = NotificationService._get_overdue_task_notifications(user_id)
             notifications.extend(overdue_notifications)
-            
+
             # Check for upcoming deadlines
             upcoming_notifications = NotificationService._get_upcoming_deadline_notifications(user_id)
             notifications.extend(upcoming_notifications)
-            
+
             # Check for welcome/onboarding notifications
             welcome_notifications = NotificationService._get_welcome_notifications(user)
             notifications.extend(welcome_notifications)
-            
+
+            # Hide notifications the user has dismissed
+            from models import NotificationDismissal
+            dismissed_ids = {
+                d.notification_id
+                for d in NotificationDismissal.query.filter_by(user_id=user_id).all()
+            }
+            notifications = [n for n in notifications if n['id'] not in dismissed_ids]
+
             # Sort by priority and timestamp
             notifications.sort(key=lambda x: (x.get('priority', 3), x.get('timestamp', datetime.now())), reverse=True)
-            
+
             return notifications
             
         except Exception as e:
@@ -192,15 +200,22 @@ class NotificationService:
         return notifications
     
     @staticmethod
-    def mark_notification_read(user_id: int, notification_id: str) -> bool:
-        """
-        Mark a notification as read (for future implementation with database storage)
-        """
+    def mark_notification_read(user_id: str, notification_id: str) -> bool:
+        """Persist a dismissal so the notification stays hidden (idempotent)"""
         try:
-            # For now, just log the action
-            logger.info(f"User {user_id} marked notification {notification_id} as read")
+            from models import NotificationDismissal
+
+            existing = NotificationDismissal.query.filter_by(
+                user_id=user_id, notification_id=notification_id
+            ).first()
+            if not existing:
+                db.session.add(NotificationDismissal(
+                    user_id=user_id, notification_id=notification_id
+                ))
+                db.session.commit()
             return True
         except Exception as e:
+            db.session.rollback()
             logger.error(f"Error marking notification as read: {str(e)}")
             return False
     
@@ -226,25 +241,3 @@ class NotificationService:
             logger.error(f"Error sending email notification: {str(e)}")
             return False
     
-    @staticmethod
-    def send_sms_notification(user_id: int, notification: Dict) -> bool:
-        """
-        Send SMS notification (placeholder for future implementation)
-        """
-        try:
-            user = User.query.get(user_id)
-            if not user:
-                return False
-            
-            # Placeholder for SMS service integration
-            logger.info(f"Would send SMS to user {user_id}: {notification['title']}")
-            
-            # Future implementation would integrate with services like:
-            # - Twilio
-            # - AWS SNS
-            # - MessageBird
-            
-            return True
-        except Exception as e:
-            logger.error(f"Error sending SMS notification: {str(e)}")
-            return False
