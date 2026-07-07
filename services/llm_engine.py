@@ -1,114 +1,47 @@
+"""LLM answer generation grounded in official Munich relocation knowledge.
+
+Implementation is deliberately framework-free: a single grounded prompt with
+provider fallback needs no agent framework. It uses:
+
+- the OpenAI SDK for chat completions - Featherless AI is the primary
+  provider (OpenAI-compatible base_url), OpenAI the fallback
+- fastembed for local embeddings (no API key required)
+- qdrant-client for in-memory vector retrieval
+
+The knowledge base loads from the knowledge_documents table (populated by
+'flask refresh-knowledge' from official sources) and falls back to curated
+built-in knowledge. The vector index is cached and versioned against the
+table so a refresh is picked up without restarting the app.
+"""
 import os
 import logging
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
-from langchain_community.vectorstores import Qdrant
 
-try:
-    from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-    LANGCHAIN_OPENAI_AVAILABLE = True
-except ImportError:
-    from langchain_community.llms import OpenAI as ChatOpenAI
-    from langchain_community.embeddings import OpenAIEmbeddings
-    LANGCHAIN_OPENAI_AVAILABLE = False
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Get API keys from environment variables
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-FEATHERLESS_API_KEY = os.environ.get("FEATHERLESS_API_KEY", "")
-
-# Featherless AI configuration
+# Featherless AI configuration (OpenAI-compatible API)
 FEATHERLESS_BASE_URL = "https://api.featherless.ai/v1"
 FEATHERLESS_MODEL = "deepseek-ai/DeepSeek-V3-0324"
+OPENAI_MODEL = "gpt-4o-mini"
 
-# Initialize embeddings
-def get_embeddings():
-    """
-    Get embeddings model - use FastEmbed for Featherless, fallback to OpenAI
-    """
-    try:
-        # When using Featherless AI, we'll use FastEmbed for embeddings
-        # since Featherless doesn't support embeddings API
-        if FEATHERLESS_API_KEY:
-            logger.info("Using FastEmbed for embeddings (Nomic AI model)")
-            from langchain_community.embeddings import FastEmbedEmbeddings
-            
-            # Use Nomic AI's embedding model through FastEmbed
-            return FastEmbedEmbeddings(
-                model_name="nomic-ai/nomic-embed-text-v1.5",
-                max_length=512
-            )
-    except Exception as e:
-        logger.warning(f"Failed to initialize FastEmbed embeddings: {str(e)}")
-    
-    # Fallback to OpenAI embeddings
-    logger.info("Using OpenAI for embeddings")
-    return OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # small, fast, local
+COLLECTION_NAME = "munich_relocation_kb"
 
-# Initialize language model
-def get_llm():
-    """
-    Get language model - try Featherless first, fallback to OpenAI
-    """
-    # Try to use Featherless AI as our primary LLM provider
-    if FEATHERLESS_API_KEY:
-        try:
-            logger.info("Using Featherless AI LLM")
-            if LANGCHAIN_OPENAI_AVAILABLE:
-                return ChatOpenAI(
-                    temperature=0.5,
-                    model="deepseek-chat",
-                    api_key=FEATHERLESS_API_KEY,
-                    base_url=FEATHERLESS_BASE_URL
-                )
-            else:
-                return ChatOpenAI(
-                    temperature=0.5,
-                    openai_api_key=FEATHERLESS_API_KEY,
-                    openai_api_base=FEATHERLESS_BASE_URL
-                )
-        except Exception as e:
-            logger.warning(f"Failed to initialize Featherless LLM: {str(e)}")
-    
-    # Fall back to OpenAI if Featherless API key is not available or fails
-    if OPENAI_API_KEY:
-        try:
-            logger.info("Using OpenAI LLM as fallback")
-            if LANGCHAIN_OPENAI_AVAILABLE:
-                return ChatOpenAI(
-                    temperature=0.5,
-                    model="gpt-3.5-turbo",
-                    api_key=OPENAI_API_KEY
-                )
-            else:
-                return ChatOpenAI(
-                    temperature=0.5,
-                    openai_api_key=OPENAI_API_KEY
-                )
-        except Exception as e:
-            logger.warning(f"Failed to initialize OpenAI LLM: {str(e)}")
-    
-    # If all else fails, return a more descriptive error message
-    logger.error("No LLM provider available - both Featherless and OpenAI initialization failed")
-    raise ValueError("Could not initialize any LLM provider. Please check your API keys and connections.")
+SYSTEM_PROMPT = """You are KI Kompass, an AI assistant helping people relocate to and integrate in Munich, Germany.
 
-# Cached instances - building the vector store (and downloading the embedding
-# model) is far too slow to repeat on every chat request. The vector store is
-# additionally versioned against the knowledge_documents table so a refresh
-# ('flask refresh-knowledge') is picked up without restarting the app.
-_embeddings = None
-_vectorstore = None
-_vectorstore_version = None
-_answer_chain = None
+Follow these rules strictly:
+- You provide general guidance only, NOT legal advice. For visa, residence permit, or other legal decisions, recommend confirming with the responsible authority (e.g. the Munich Kreisverwaltungsreferat/Auslaenderbehoerde) or a qualified advisor.
+- Prefer the official information provided in the user message. If it does not cover the question, or you are not sure, say so plainly instead of guessing.
+- Procedures, fees, opening hours and required documents change over time. When it matters, remind the user to verify current details on the official website of the office in question.
+- Tailor your answer to the user's profile where relevant (visa type, family situation, employment, German level).
+- Be friendly and concise: under 150 words."""
 
-def get_cached_embeddings():
-    global _embeddings
-    if _embeddings is None:
-        _embeddings = get_embeddings()
-    return _embeddings
+# Cached singletons - the embedding model and vector index are far too slow
+# to rebuild on every chat request
+_llm_client = None
+_llm_model = None
+_embedder = None
+_qdrant = None
+_kb_version = None
 
 # Curated fallback knowledge, used until 'flask refresh-knowledge' has stored
 # live content from the official sources. Each entry carries the official URL
@@ -152,6 +85,41 @@ CURATED_KNOWLEDGE = [
     },
 ]
 
+
+def get_llm():
+    """Return (client, model): Featherless AI first, OpenAI as fallback"""
+    global _llm_client, _llm_model
+    if _llm_client is not None:
+        return _llm_client, _llm_model
+
+    from openai import OpenAI
+
+    featherless_key = os.environ.get("FEATHERLESS_API_KEY")
+    openai_key = os.environ.get("OPENAI_API_KEY")
+
+    if featherless_key:
+        logger.info("Using Featherless AI LLM")
+        _llm_client = OpenAI(api_key=featherless_key, base_url=FEATHERLESS_BASE_URL)
+        _llm_model = FEATHERLESS_MODEL
+    elif openai_key:
+        logger.info("Using OpenAI LLM")
+        _llm_client = OpenAI(api_key=openai_key)
+        _llm_model = OPENAI_MODEL
+    else:
+        raise ValueError("No LLM provider configured. Set FEATHERLESS_API_KEY or OPENAI_API_KEY.")
+
+    return _llm_client, _llm_model
+
+
+def get_embedder():
+    global _embedder
+    if _embedder is None:
+        from fastembed import TextEmbedding
+        logger.info(f"Loading embedding model {EMBEDDING_MODEL}")
+        _embedder = TextEmbedding(model_name=EMBEDDING_MODEL)
+    return _embedder
+
+
 def _load_knowledge_entries():
     """Load knowledge from the database (refreshed official pages) with a
     curated fallback, plus a version key for cache invalidation."""
@@ -169,31 +137,40 @@ def _load_knowledge_entries():
     logger.info("Using curated fallback knowledge base")
     return CURATED_KNOWLEDGE, ("curated", len(CURATED_KNOWLEDGE))
 
-# Get knowledge base for relocation to Munich
-def get_knowledge_base():
-    """Create or return the Qdrant vector store for relocation knowledge,
+
+def get_knowledge_index():
+    """Create or return the in-memory Qdrant index over relocation knowledge,
     rebuilding it when the underlying knowledge documents change."""
-    global _vectorstore, _vectorstore_version
+    global _qdrant, _kb_version
 
     entries, version = _load_knowledge_entries()
-    if _vectorstore is not None and _vectorstore_version == version:
-        return _vectorstore
+    if _qdrant is not None and _kb_version == version:
+        return _qdrant
 
-    embeddings = get_cached_embeddings()
+    from qdrant_client import QdrantClient
+    from qdrant_client.models import Distance, VectorParams, PointStruct
 
-    try:
-        _vectorstore = Qdrant.from_texts(
-            texts=[e["text"] for e in entries],
-            embedding=embeddings,
-            metadatas=[{"source": e["source"]} for e in entries],
-            location=":memory:",
-            collection_name="munich_relocation_kb"
-        )
-        _vectorstore_version = version
-        return _vectorstore
-    except Exception as e:
-        logger.error(f"Failed to create vector store: {str(e)}")
-        raise e
+    embedder = get_embedder()
+    vectors = list(embedder.embed([e["text"] for e in entries]))
+
+    client = QdrantClient(":memory:")
+    client.create_collection(
+        collection_name=COLLECTION_NAME,
+        vectors_config=VectorParams(size=len(vectors[0]), distance=Distance.COSINE),
+    )
+    client.upsert(
+        collection_name=COLLECTION_NAME,
+        points=[
+            PointStruct(id=i, vector=vector.tolist(),
+                        payload={"text": entry["text"], "source": entry["source"]})
+            for i, (entry, vector) in enumerate(zip(entries, vectors))
+        ],
+    )
+
+    _qdrant = client
+    _kb_version = version
+    return _qdrant
+
 
 def retrieve_context(query, k=3):
     """Retrieve the most relevant knowledge passages for a query.
@@ -201,59 +178,47 @@ def retrieve_context(query, k=3):
     Returns (context_text, source_urls) so answers can cite where the
     information came from.
     """
-    vectorstore = get_knowledge_base()
-    docs = vectorstore.similarity_search(query, k=k)
+    index = get_knowledge_index()
+    embedder = get_embedder()
+    query_vector = list(embedder.embed([query]))[0].tolist()
 
-    context = "\n\n".join(doc.page_content for doc in docs)
+    hits = index.query_points(
+        collection_name=COLLECTION_NAME,
+        query=query_vector,
+        limit=k,
+    ).points
+
+    context = "\n\n".join(hit.payload["text"] for hit in hits)
     sources = []
-    for doc in docs:
-        source = (doc.metadata or {}).get("source")
+    for hit in hits:
+        source = hit.payload.get("source")
         if source and source not in sources:
             sources.append(source)
 
     return context, sources
 
-# Single answer chain: guardrails + user profile + retrieved context + history.
-# The caller supplies chat_history from the database per invoke, so memory is
-# per-conversation and never shared between users.
-def get_answer_chain():
-    global _answer_chain
-    if _answer_chain is not None:
-        return _answer_chain
 
-    llm = get_llm()
+def generate_answer(question, context, user_profile, history_text):
+    """Generate a grounded, guarded answer via the configured LLM"""
+    client, model = get_llm()
 
-    template = """You are KI Kompass, an AI assistant helping people relocate to and integrate in Munich, Germany.
-
-Follow these rules strictly:
-- You provide general guidance only, NOT legal advice. For visa, residence permit, or other legal decisions, recommend confirming with the responsible authority (e.g. the Munich Kreisverwaltungsreferat/Auslaenderbehoerde) or a qualified advisor.
-- Prefer the official information provided below. If it does not cover the question, or you are not sure, say so plainly instead of guessing.
-- Procedures, fees, opening hours and required documents change over time. When it matters, remind the user to verify current details on the official website of the office in question.
-- Tailor your answer to the user's profile where relevant (visa type, family situation, employment, German level).
-- Be friendly and concise: under 150 words.
-
-Official information:
+    user_message = f"""Official information:
 {context}
 
 User profile: {user_profile}
 
 Conversation so far:
-{chat_history}
+{history_text}
 
-User question: {question}
+User question: {question}"""
 
-Your response:"""
-
-    prompt = PromptTemplate(
-        input_variables=["context", "user_profile", "chat_history", "question"],
-        template=template
+    response = client.chat.completions.create(
+        model=model,
+        temperature=0.5,
+        max_tokens=400,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_message},
+        ],
     )
-
-    _answer_chain = LLMChain(
-        llm=llm,
-        prompt=prompt,
-        verbose=True,
-        output_key="text"
-    )
-
-    return _answer_chain
+    return (response.choices[0].message.content or "").strip()
