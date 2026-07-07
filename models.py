@@ -160,18 +160,24 @@ class ChatMessage(db.Model):
             conversation_id=conversation_id
         ).order_by(cls.created_at.asc()).limit(limit).all()
     
-    @classmethod
-    def get_conversation_summary(cls, user_id, conversation_id):
-        """Get a summary of the conversation"""
-        user_messages = cls.query.filter_by(
-            user_id=user_id,
-            conversation_id=conversation_id,
-            role="user"
-        ).order_by(cls.created_at.asc()).all()
-        
-        # Create a simple summary based on user messages
-        if not user_messages:
-            return "No conversation history"
-        
-        # Return the first few user messages as a summary
-        return ", ".join([m.content for m in user_messages[:3]])
+
+class NotificationDismissal(db.Model):
+    """Notifications the user has marked as read.
+
+    Notifications themselves are computed on the fly (from task deadlines
+    etc.) with stable string ids like 'overdue_12'; a dismissal row hides
+    that notification from future listings.
+    """
+    __tablename__ = 'notification_dismissals'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String, ForeignKey('users.id'), nullable=False)
+    notification_id = Column(String(64), nullable=False)
+    dismissed_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (UniqueConstraint(
+        'user_id', 'notification_id', name='uq_user_notification_dismissal'
+    ),)
+
+    def __repr__(self):
+        return f"<NotificationDismissal {self.user_id}:{self.notification_id}>"

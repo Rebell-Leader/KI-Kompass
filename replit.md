@@ -12,10 +12,14 @@ KI Kompass (AI Compass) is a Munich-focused relocation and integration assistant
 
 ## Backend Architecture
 - **Framework**: Flask (Python web framework)
-- **Architecture Pattern**: Modular design with blueprints for route organization
-- **Database ORM**: SQLAlchemy with Flask-SQLAlchemy extension
-- **Session Management**: Flask sessions with secure secret key
-- **Authentication**: Password hashing with Werkzeug security utilities
+- **Module layout**:
+  - `app.py` - app creation, config, extensions, blueprint registration, CLI commands
+  - `blueprints/` - `pages` (server-rendered pages), `api` (JSON endpoints), `demo` (no-login demo mode)
+  - `auth/` - pluggable auth backends: Replit OIDC, Supabase email/password, local dev login (selected by env vars, all registered as the `auth` blueprint)
+  - `services/` - domain logic: pipeline engine, tasks, AI assistant, LLM engine, notifications, reminders, email, knowledge refresh, bootstrap, validation
+  - `models.py`, `data/action_steps.py`, `migrations/` (Alembic), `tests/` (pytest)
+- **Database ORM**: SQLAlchemy with Flask-SQLAlchemy extension; Alembic migrations
+- **Session Management**: Flask sessions with secure secret key; CSRF protection; rate limiting
 
 ## Database Design
 - **Primary Database**: PostgreSQL with SQLAlchemy ORM
@@ -35,10 +39,10 @@ KI Kompass (AI Compass) is a Munich-focused relocation and integration assistant
 - **Progress Tracking**: Calculates completion percentage and manages task deadlines
 
 ## AI Assistant Service
-- **LLM Integration**: Supports both OpenAI and Featherless AI as providers
-- **Conversation Management**: Maintains chat history with conversation IDs
-- **Context Awareness**: Uses user profile information to provide personalized responses
-- **Knowledge Base**: Integrated with Langchain for enhanced responses
+- **LLM Integration**: OpenAI SDK directly - Featherless AI primary (OpenAI-compatible base_url), OpenAI fallback; no agent framework (a single grounded prompt doesn't need one)
+- **Conversation Management**: Per-conversation history stored in the database and passed to the model
+- **Context Awareness**: Profile-aware prompt with legal-guidance guardrails and source citations
+- **Knowledge Base**: fastembed embeddings + in-memory Qdrant retrieval over refreshed official documents (curated fallback)
 
 ## Action Steps Management
 - **Pre-defined Templates**: Database populated with Munich-specific relocation tasks

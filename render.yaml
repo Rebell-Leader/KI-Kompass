@@ -1,0 +1,35 @@
+# Render Blueprint - deploys the app as a free web service.
+# https://render.com/docs/blueprint-spec
+#
+# Set the sync:false env vars in the Render dashboard after the first deploy:
+#   DATABASE_URL       Supabase connection string (Session pooler, port 5432)
+#   SUPABASE_URL       https://<project-ref>.supabase.co   (enables Supabase auth)
+#   SUPABASE_ANON_KEY  the project's anon/public key
+#   FEATHERLESS_API_KEY or OPENAI_API_KEY   (enables AI chat)
+#   SMTP_* / MAIL_FROM (optional - email reminders; see DEPLOYMENT.md)
+
+services:
+  - type: web
+    name: ki-kompass
+    runtime: python
+    plan: free
+    buildCommand: pip install uv && uv sync --frozen
+    startCommand: uv run flask db upgrade && uv run gunicorn --bind 0.0.0.0:$PORT --workers 2 main:app
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: FLASK_APP
+        value: main.py
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SESSION_COOKIE_SECURE
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: FEATHERLESS_API_KEY
+        sync: false

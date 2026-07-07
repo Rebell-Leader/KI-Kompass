@@ -29,7 +29,7 @@
                     <div class="tab-content" id="profileTabsContent">
                         <!-- Personal Information Tab -->
                         <div class="tab-pane fade show active" id="personal" role="tabpanel" aria-labelledby="personal-tab">
-                            <form action="{{ url_for('update_profile') }}" method="POST" id="profile-form">
+                            <form action="{{ url_for('pages.update_profile') }}" method="POST" id="profile-form">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <div class="row mb-3">
                                     <div class="col-md-6">

@@ -36,7 +36,7 @@
         
         <div class="card shadow-sm mb-4">
             <div class="card-body p-4">
-                <form action="{{ url_for('onboarding') }}" method="POST" id="onboarding-form">
+                <form action="{{ url_for('pages.onboarding') }}" method="POST" id="onboarding-form">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <!-- Step 1: Personal Information -->
                     <div class="onboarding-section active" id="step-1">

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --group dev
+
+      - name: Run tests
+        run: uv run pytest -v
+
+      - name: Verify app boots and migrations apply
+        env:
+          FLASK_APP: main.py
+          FLASK_SKIP_DB_CREATE: "1"
+          DATABASE_URL: sqlite:///ci_migrations.db
+        run: |
+          uv run flask db upgrade
+          unset FLASK_SKIP_DB_CREATE
+          uv run python -c "from app import app; print('app OK,', len(list(app.url_map.iter_rules())), 'routes')"

@@ -80,7 +80,7 @@ def get_ai_response(query, user, conversation_id=None):
                 ai_response = f"Hello{' ' + user.full_name if user.full_name else ''}! I'm KI Kompass, your Munich relocation assistant. How can I help you today?"
             else:
                 # Import lazily so the app can start without the LLM stack installed
-                from services.llm_engine import get_answer_chain, retrieve_context
+                from services.llm_engine import retrieve_context, generate_answer
 
                 # Retrieve relevant official knowledge and format recent history
                 # (last 5 exchanges keeps the prompt bounded)
@@ -89,14 +89,12 @@ def get_ai_response(query, user, conversation_id=None):
                     f"User: {u}\nAssistant: {a}" for u, a in chat_history[-5:]
                 ) or "(no previous messages)"
 
-                chain = get_answer_chain()
-                response = chain.invoke({
-                    "context": context,
-                    "user_profile": str(user_profile),
-                    "chat_history": history_text,
-                    "question": query
-                })
-                ai_response = response.get("text", "I'm not sure how to answer that question.")
+                ai_response = generate_answer(
+                    question=query,
+                    context=context,
+                    user_profile=str(user_profile),
+                    history_text=history_text
+                ) or "I'm not sure how to answer that question."
 
                 # Cite where the grounding information came from so users can
                 # verify current details on the official pages

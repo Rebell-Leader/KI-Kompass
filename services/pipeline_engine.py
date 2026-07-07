@@ -7,7 +7,7 @@ def generate_pipeline(user_id):
     """
     Generate a personalized integration pipeline based on user profile.
     """
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
     if not user:
         raise ValueError("User not found")
     
@@ -47,6 +47,38 @@ def generate_pipeline(user_id):
     db.session.commit()
     return pipeline
 
+# Map specific visa types to general step categories (keys are lowercase;
+# user input is normalized before lookup so form values like "EU_Citizen"
+# match too). Also the source of truth for input validation.
+VISA_TYPE_MAPPING = {
+    # EU visa types
+    "eu_citizen": "eu",
+    "eu_family": "eu",
+    # Work-related visa types
+    "work": "work",
+    "work_visa": "work",
+    "work_permit": "work",
+    "blue_card": "work",
+    "freelancer": "work",
+    "entrepreneur": "work",
+    "job_seeker": "job seeker",
+    # Study-related visa types
+    "study": "study",
+    "student": "study",
+    "student_visa": "study",
+    "language_course": "study",
+    "research": "study",
+    # Family-related visa types
+    "family_reunion": "family reunion",
+    "spouse": "family reunion",
+    "child_reunion": "family reunion",
+    # Other visa types
+    "humanitarian": "humanitarian",
+    "refugee": "humanitarian",
+    "asylum": "humanitarian"
+}
+
+
 def select_steps_for_user(user):
     """
     Select appropriate action steps based on user profile.
@@ -54,40 +86,10 @@ def select_steps_for_user(user):
     # Create a logger for this function
     logger = logging.getLogger(__name__)
     logger.debug(f"Selecting steps for user with visa_type: {user.visa_type}")
-    
-    # Map specific visa types to general categories (keys are lowercase; user
-    # input is normalized below so form values like "EU_Citizen" match too)
-    visa_type_mapping = {
-        # EU visa types
-        "eu_citizen": "eu",
-        "eu_family": "eu",
-        # Work-related visa types
-        "work": "work",
-        "work_visa": "work",
-        "work_permit": "work",
-        "blue_card": "work",
-        "freelancer": "work",
-        "entrepreneur": "work",
-        "job_seeker": "job seeker",
-        # Study-related visa types
-        "study": "study",
-        "student": "study",
-        "student_visa": "study",
-        "language_course": "study",
-        "research": "study",
-        # Family-related visa types
-        "family_reunion": "family reunion",
-        "spouse": "family reunion",
-        "child_reunion": "family reunion",
-        # Other visa types
-        "humanitarian": "humanitarian",
-        "refugee": "humanitarian",
-        "asylum": "humanitarian"
-    }
 
     # Normalize and generalize the user's visa type
     user_visa_type = (user.visa_type or "").strip().lower()
-    general_visa_type = visa_type_mapping.get(user_visa_type)
+    general_visa_type = VISA_TYPE_MAPPING.get(user_visa_type)
     logger.debug(f"Mapped visa type: {general_visa_type}")
     
     # Get all steps from database
@@ -160,7 +162,7 @@ def calculate_progress(pipeline_id):
     progress = (completed_tasks / total_tasks) * 100 if total_tasks > 0 else 0
     
     # Update pipeline progress
-    pipeline = IntegrationPipeline.query.get(pipeline_id)
+    pipeline = db.session.get(IntegrationPipeline, pipeline_id)
     if pipeline:
         pipeline.progress = progress
         db.session.commit()

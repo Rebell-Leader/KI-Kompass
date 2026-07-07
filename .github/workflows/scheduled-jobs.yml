@@ -1,0 +1,52 @@
+# Daily maintenance jobs run against the production database.
+#
+# Render's free tier has no cron, so these run here. Configure repository
+# secrets (Settings -> Secrets and variables -> Actions):
+#   DATABASE_URL  - the production (e.g. Supabase) connection string
+#   SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, MAIL_FROM - for reminders
+#
+# Jobs skip gracefully when DATABASE_URL is not configured.
+name: Scheduled jobs
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # daily at 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  daily-maintenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Refresh knowledge base from official sources
+        if: ${{ vars.ENABLE_SCHEDULED_JOBS == 'true' }}
+        env:
+          FLASK_APP: main.py
+          FLASK_SKIP_DB_CREATE: "1"
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: uv run flask refresh-knowledge
+
+      - name: Send deadline reminder emails
+        if: ${{ vars.ENABLE_SCHEDULED_JOBS == 'true' }}
+        env:
+          FLASK_APP: main.py
+          FLASK_SKIP_DB_CREATE: "1"
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+        run: uv run flask send-reminders

@@ -18,7 +18,7 @@
     
     <!-- Stylesheets -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    {% if request.path == url_for('chat') %}
+    {% if request.path == url_for('pages.chat') %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
     {% endif %}
     
@@ -43,7 +43,7 @@
     <!-- Header -->
     <header class="site-header">
         <div class="container header-container">
-            <a href="{{ url_for('index') }}" class="logo">
+            <a href="{{ url_for('pages.index') }}" class="logo">
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2" style="margin-right: 8px;"><circle cx="12" cy="12" r="10"></circle><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon></svg>
                 KI <span>Kompass</span>
             </a>
@@ -51,13 +51,13 @@
             <nav class="main-nav">
                 <ul>
                     {% if current_user.is_authenticated %}
-                        <li><a href="{{ url_for('dashboard') }}" {% if request.path == url_for('dashboard') %}class="active"{% endif %}>Dashboard</a></li>
-                        <li><a href="{{ url_for('chat') }}" {% if request.path == url_for('chat') %}class="active"{% endif %}>AI Chat</a></li>
-                        <li><a href="{{ url_for('profile') }}" {% if request.path == url_for('profile') %}class="active"{% endif %}>Profile</a></li>
-                        <li><a href="{{ url_for('replit_auth.logout') }}">Logout</a></li>
+                        <li><a href="{{ url_for('pages.dashboard') }}" {% if request.path == url_for('pages.dashboard') %}class="active"{% endif %}>Dashboard</a></li>
+                        <li><a href="{{ url_for('pages.chat') }}" {% if request.path == url_for('pages.chat') %}class="active"{% endif %}>AI Chat</a></li>
+                        <li><a href="{{ url_for('pages.profile') }}" {% if request.path == url_for('pages.profile') %}class="active"{% endif %}>Profile</a></li>
+                        <li><a href="{{ url_for('auth.logout') }}">Logout</a></li>
                     {% else %}
-                        <li><a href="{{ url_for('index') }}" {% if request.path == url_for('index') %}class="active"{% endif %}>Home</a></li>
-                        <li><a href="{{ url_for('replit_auth.login') }}">Login</a></li>
+                        <li><a href="{{ url_for('pages.index') }}" {% if request.path == url_for('pages.index') %}class="active"{% endif %}>Home</a></li>
+                        <li><a href="{{ url_for('auth.login') }}">Login</a></li>
                     {% endif %}
                 </ul>
             </nav>
@@ -93,11 +93,11 @@
                 <div class="footer-section">
                     <h4>Quick Links</h4>
                     <ul class="footer-links">
-                        <li><a href="{{ url_for('index') }}">Home</a></li>
+                        <li><a href="{{ url_for('pages.index') }}">Home</a></li>
                         {% if 'user_id' in session %}
-                            <li><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
-                            <li><a href="{{ url_for('chat') }}">AI Chat</a></li>
-                            <li><a href="{{ url_for('profile') }}">Profile</a></li>
+                            <li><a href="{{ url_for('pages.dashboard') }}">Dashboard</a></li>
+                            <li><a href="{{ url_for('pages.chat') }}">AI Chat</a></li>
+                            <li><a href="{{ url_for('pages.profile') }}">Profile</a></li>
                         {% endif %}
                     </ul>
                 </div>
